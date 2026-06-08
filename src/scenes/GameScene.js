@@ -11,6 +11,7 @@ import {
 } from '../config.js';
 import { cellCenter, pixelToCell, inBounds } from '../grid.js';
 import { level1 } from '../maps/level1.js';
+import { WAVES } from '../maps/waves.js';
 import { findPath } from '../pathfinding/astar.js';
 import Enemy from '../entities/Enemy.js';
 import Tower from '../entities/Tower.js';
@@ -36,6 +37,12 @@ export default class GameScene extends Phaser.Scene {
     this.kills = 0;
     this.selectedTool = null; // currently selected tower type, or null
 
+    // Wave state.
+    this.currentWave = 0; // 0 = none started yet
+    this.waveActive = false;
+    this.pendingSpawns = 0; // enemies scheduled but not yet spawned
+    this.allWavesCleared = false;
+
     // Two grids:
     //   blocked  — pathfinding walls (only structure towers set this true).
     //   occupied — any tower (wall OR trap), so we never stack two on a cell.
@@ -54,7 +61,7 @@ export default class GameScene extends Phaser.Scene {
     this.createInput();
     this.createUi();
 
-    this.startSpawning();
+    this.refreshWaveUi();
   }
 
   // ---- pathfinding -------------------------------------------------------
@@ -122,26 +129,53 @@ export default class GameScene extends Phaser.Scene {
     this.updateHud();
   }
 
-  // ---- spawning ----------------------------------------------------------
+  // ---- waves -------------------------------------------------------------
 
-  // Step 6 is still pre-waves: trickle a mix of both enemy types so we can see
-  // both towers and the type interactions. Real wave structure arrives in step 7.
-  startSpawning() {
-    const script = [
-      ENEMIES.lightScout,
-      ENEMIES.lightScout,
-      ENEMIES.lightScout,
-      ENEMIES.heavyWalker,
-      ENEMIES.heavyWalker,
-      ENEMIES.lightScout,
-      ENEMIES.heavyWalker,
-    ];
-    let i = 0;
-    this.time.addEvent({
-      delay: 1200,
-      repeat: script.length - 1,
-      callback: () => this.spawnEnemy(script[i++]),
-    });
+  // Kick off the next wave. Enemies in each group are scheduled with timers so
+  // the player gets uninterrupted planning time between waves, then a steady
+  // stream once a wave starts.
+  startWave() {
+    if (this.waveActive || this.allWavesCleared) return;
+    if (this.currentWave >= WAVES.length) return;
+
+    this.currentWave += 1;
+    this.waveActive = true;
+    this.pendingSpawns = 0;
+
+    const wave = WAVES[this.currentWave - 1];
+    let cursor = 0; // ms offset from wave start
+    for (const group of wave.groups) {
+      cursor += group.startDelay || 0;
+      const stats = ENEMIES[group.type];
+      for (let i = 0; i < group.count; i++) {
+        const at = cursor + i * group.gap;
+        this.pendingSpawns += 1;
+        this.time.delayedCall(at, () => {
+          this.pendingSpawns -= 1;
+          this.spawnEnemy(stats);
+        });
+      }
+      cursor += group.count * group.gap;
+    }
+
+    this.refreshWaveUi();
+  }
+
+  // A wave is over once everything has spawned and the field is clear.
+  checkWaveComplete() {
+    if (!this.waveActive) return;
+    if (this.pendingSpawns > 0 || this.enemies.length > 0) return;
+
+    this.waveActive = false;
+    if (this.currentWave >= WAVES.length) {
+      this.allWavesCleared = true;
+      this.onAllWavesCleared();
+    }
+    this.refreshWaveUi();
+  }
+
+  onAllWavesCleared() {
+    // Win condition + end screen are wired up in step 9.
   }
 
   spawnEnemy(stats) {
@@ -155,6 +189,7 @@ export default class GameScene extends Phaser.Scene {
     for (const tower of this.towers) tower.update(delta, this.enemies);
     for (const enemy of this.enemies) enemy.update(delta);
     this.enemies = this.enemies.filter((e) => e.alive);
+    this.checkWaveComplete();
   }
 
   // Brief shot tracer from tower to target, fading out.
@@ -281,6 +316,24 @@ export default class GameScene extends Phaser.Scene {
       this.makeToolButton(GAME_WIDTH - 356, 6, TOWERS.tripwire),
     ];
 
+    // "Start Next Wave" button, centered in the top bar.
+    this.startWaveBg = this.add
+      .rectangle(GAME_WIDTH / 2 - 100, 6, 200, 32, COLORS.ghostOk)
+      .setOrigin(0)
+      .setStrokeStyle(2, 0x2a8a4d)
+      .setDepth(9)
+      .setInteractive({ useHandCursor: true });
+    this.startWaveLabel = this.add
+      .text(GAME_WIDTH / 2, 22, '', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '14px',
+        color: '#08240f',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setDepth(10);
+    this.startWaveBg.on('pointerdown', () => this.startWave());
+
     this.hintText = this.add
       .text(GAME_WIDTH - 366, 50, '', {
         fontFamily: 'system-ui, sans-serif',
@@ -336,8 +389,23 @@ export default class GameScene extends Phaser.Scene {
 
   updateHud() {
     this.hudText.setText(
-      `Shield HP: ${this.baseHp}    Towers: ${this.towers.length}    Kills: ${this.kills}`
+      `Wave: ${this.currentWave} / ${WAVES.length}    Shield HP: ${this.baseHp}    ` +
+        `Towers: ${this.towers.length}    Kills: ${this.kills}`
     );
+  }
+
+  // Updates the wave HUD + the Start button's label and enabled state. The
+  // button is hidden while a wave is in progress (no interrupting it) and after
+  // the final wave is cleared.
+  refreshWaveUi() {
+    this.updateHud();
+
+    const show = !this.waveActive && !this.allWavesCleared;
+    this.startWaveBg.setVisible(show);
+    this.startWaveLabel.setVisible(show);
+    if (show) {
+      this.startWaveLabel.setText(`Start Wave ${this.currentWave + 1}`);
+    }
   }
 
   // ---- drawing -----------------------------------------------------------

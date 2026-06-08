@@ -34,7 +34,7 @@ Following the staged build order from the spec:
 - [x] **Step 4** — Tower placement (Sniper Towers, block validation, live rerouting)
 - [x] **Step 5** — Tower shooting + enemy death (targeting, tracers, range ring, kills)
 - [x] **Step 6** — Heavy Walker enemy + Tripwire Hook trap (type interactions)
-- [ ] Step 7 — Waves
+- [x] **Step 7** — Waves (20 hand-tuned waves + "Start Next Wave" button)
 - [ ] Step 8 — Economy
 - [ ] Step 9 — Win / lose conditions
 - [ ] Step 10 — Polish pass
