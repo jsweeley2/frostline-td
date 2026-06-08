@@ -29,8 +29,8 @@ Hosted on Vercel, auto-deploying from the `main` branch.
 Following the staged build order from the spec:
 
 - [x] **Step 1** — Pipeline check: Phaser + Vite running locally and on Vercel (colored square)
-- [ ] Step 2 — Grid + shield generator
-- [ ] Step 3 — Enemy spawning + A* pathfinding
+- [x] **Step 2** — Grid + shield generator
+- [x] **Step 3** — Enemy spawning + A* pathfinding (Light Scouts walk to base, damage it)
 - [ ] Step 4 — Tower placement (with path-blocking validation)
 - [ ] Step 5 — Tower shooting + enemy death
 - [ ] Step 6 — Second enemy + second tower

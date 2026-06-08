@@ -20,4 +20,20 @@ export const COLORS = {
   base: 0x2bd4d9, // shield generator core (cyan)
   baseRing: 0x12808a, // shield generator ring
   text: 0x12386b, // dark blue text
+  path: 0x6f8fbf, // debug path overlay
+  lightScout: 0xffb24d, // Light Scout enemy (orange)
+};
+
+// Enemy stats. Tuned for the slow, cerebral pace; refined in the step-10 pass.
+//   speed  = pixels per second
+//   damage = HP removed from the shield generator if it reaches the base
+export const ENEMIES = {
+  lightScout: {
+    name: 'Light Scout',
+    hp: 30,
+    speed: 115,
+    damage: 5,
+    radius: 9,
+    color: COLORS.lightScout,
+  },
 };
