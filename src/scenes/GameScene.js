@@ -53,6 +53,8 @@ export default class GameScene extends Phaser.Scene {
     this.autoStart = false; // auto-launch next wave once field clears
     this.autoStartPending = false; // a queued auto-start timer is in flight
 
+    this.gameEnded = false; // win or lose reached
+
     // Two grids:
     //   blocked  — pathfinding walls (only structure towers set this true).
     //   occupied — any tower (wall OR trap), so we never stack two on a cell.
@@ -184,8 +186,8 @@ export default class GameScene extends Phaser.Scene {
 
     if (allLaunched && !this.waveInProgress) {
       this.allWavesCleared = true;
-      this.onAllWavesCleared();
       this.refreshWaveUi();
+      this.endGame(true); // survived every wave
       return;
     }
 
@@ -203,8 +205,16 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  onAllWavesCleared() {
-    // Win condition + end screen are wired up in step 9.
+  // Freeze the game and show the win/lose overlay. Guarded so it fires once.
+  endGame(win) {
+    if (this.gameEnded) return;
+    this.gameEnded = true;
+    this.scene.pause();
+    this.scene.launch('EndScene', {
+      win,
+      wave: this.currentWave,
+      kills: this.kills,
+    });
   }
 
   spawnEnemy(stats) {
@@ -243,6 +253,7 @@ export default class GameScene extends Phaser.Scene {
   onEnemyReachBase(enemy) {
     this.baseHp = Math.max(0, this.baseHp - enemy.damage);
     this.updateHud();
+    if (this.baseHp <= 0) this.endGame(false);
   }
 
   onEnemyKilled(enemy) {

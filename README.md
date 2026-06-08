@@ -37,5 +37,5 @@ Following the staged build order from the spec:
 - [x] **Step 7** — Waves (20 hand-tuned waves + "Start Next Wave" button)
 - [x] **Step 8** — Economy (starting credits, kill rewards, tower costs enforced)
 - [x] **Controls** — speed toggle (1x/2x/3x), auto-start, rush-next-wave (overlapping waves)
-- [ ] Step 9 — Win / lose conditions
-- [ ] Step 10 — Polish pass
+- [x] **Step 9** — Win / lose conditions (Game Over + Victory screens, Play Again)
+- [ ] Step 10 — Polish pass (balance tuning)
