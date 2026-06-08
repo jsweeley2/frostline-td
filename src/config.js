@@ -11,6 +11,16 @@ export const ROWS = 16;
 export const GAME_WIDTH = COLS * TILE; // 960
 export const GAME_HEIGHT = ROWS * TILE; // 640
 
+// Economy (step 8). Credits start fixed, are earned per kill, and are spent
+// placing towers. Tuned further in the step-10 pass.
+export const STARTING_CREDITS = 150;
+
+// Game-speed multipliers the speed button cycles through.
+export const SPEED_STEPS = [1, 2, 3];
+
+// Game-time delay before an auto-started wave begins once the field is clear.
+export const AUTO_START_DELAY_MS = 2000;
+
 // Palette (ice-planet theme). Hex numbers for Phaser fills.
 export const COLORS = {
   snow: 0xdfe9f5, // base snowfield
@@ -76,6 +86,7 @@ export const ENEMIES = {
     hp: 30,
     speed: 115,
     damage: 5,
+    reward: 5, // credits awarded on kill
     radius: 9,
     shape: 'circle', // nimble scout
     color: COLORS.lightScout,
@@ -87,6 +98,7 @@ export const ENEMIES = {
     hp: 200,
     speed: 45,
     damage: 25,
+    reward: 20, // credits awarded on kill
     radius: 15,
     shape: 'square', // bulky four-legged walker
     color: COLORS.heavyWalker,
