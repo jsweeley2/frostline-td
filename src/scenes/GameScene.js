@@ -33,6 +33,7 @@ export default class GameScene extends Phaser.Scene {
     this.baseHp = level1.baseHp;
     this.enemies = [];
     this.towers = [];
+    this.kills = 0;
     this.selectedTool = null; // currently selected tower type, or null
 
     // Blocked-cell grid: false = walkable. Towers flip cells to true.
@@ -125,8 +126,22 @@ export default class GameScene extends Phaser.Scene {
   // ---- per-frame update --------------------------------------------------
 
   update(time, delta) {
+    for (const tower of this.towers) tower.update(delta, this.enemies);
     for (const enemy of this.enemies) enemy.update(delta);
     this.enemies = this.enemies.filter((e) => e.alive);
+  }
+
+  // Brief shot tracer from tower to target, fading out.
+  fireTracer(x1, y1, x2, y2, color) {
+    const g = this.add.graphics().setDepth(5);
+    g.lineStyle(2, color, 0.95);
+    g.lineBetween(x1, y1, x2, y2);
+    this.tweens.add({
+      targets: g,
+      alpha: 0,
+      duration: 120,
+      onComplete: () => g.destroy(),
+    });
   }
 
   // ---- enemy outcomes ----------------------------------------------------
@@ -137,7 +152,9 @@ export default class GameScene extends Phaser.Scene {
   }
 
   onEnemyKilled() {
-    // Credits/kill rewards land in step 8.
+    this.kills += 1;
+    this.updateHud();
+    // Credit rewards are added in step 8.
   }
 
   // ---- input -------------------------------------------------------------
@@ -157,8 +174,18 @@ export default class GameScene extends Phaser.Scene {
       .setVisible(false)
       .setDepth(6);
 
+    // Faint circle showing the selected tower's range while placing.
+    this.ghostRange = this.add
+      .circle(0, 0, 10, COLORS.ghostOk, 0.08)
+      .setStrokeStyle(1, COLORS.ghostOk, 0.5)
+      .setVisible(false)
+      .setDepth(5);
+
     this.gridZone.on('pointermove', (pointer) => this.onGridHover(pointer));
-    this.gridZone.on('pointerout', () => this.ghost.setVisible(false));
+    this.gridZone.on('pointerout', () => {
+      this.ghost.setVisible(false);
+      this.ghostRange.setVisible(false);
+    });
     this.gridZone.on('pointerdown', (pointer) => this.onGridClick(pointer));
 
     // Right-click or Escape cancels the current tower selection.
@@ -172,19 +199,30 @@ export default class GameScene extends Phaser.Scene {
   onGridHover(pointer) {
     if (!this.selectedTool) {
       this.ghost.setVisible(false);
+      this.ghostRange.setVisible(false);
       return;
     }
     const { col, row } = pixelToCell(pointer.worldX, pointer.worldY);
     if (!inBounds(col, row)) {
       this.ghost.setVisible(false);
+      this.ghostRange.setVisible(false);
       return;
     }
     const { x, y } = cellCenter(col, row);
     const ok = this.canPlace(col, row);
-    this.ghost
-      .setPosition(x, y)
-      .setFillStyle(ok ? COLORS.ghostOk : COLORS.ghostBad, 0.45)
-      .setVisible(true);
+    const tint = ok ? COLORS.ghostOk : COLORS.ghostBad;
+    this.ghost.setPosition(x, y).setFillStyle(tint, 0.45).setVisible(true);
+
+    const range = this.selectedTool.range || 0;
+    if (range > 0) {
+      this.ghostRange
+        .setPosition(x, y)
+        .setRadius(range)
+        .setStrokeStyle(1, tint, 0.5)
+        .setVisible(true);
+    } else {
+      this.ghostRange.setVisible(false);
+    }
   }
 
   onGridClick(pointer) {
@@ -256,14 +294,19 @@ export default class GameScene extends Phaser.Scene {
     this.selectedTool = stats;
     const on = this.sniperButton.stats === stats;
     this.sniperButton.bg.setFillStyle(on ? COLORS.uiButtonOn : COLORS.uiButton);
-    if (!stats) this.ghost.setVisible(false);
+    if (!stats) {
+      this.ghost.setVisible(false);
+      this.ghostRange.setVisible(false);
+    }
     this.hintText.setText(
       stats ? 'Click a cell to place.\nRight-click / Esc to cancel.' : ''
     );
   }
 
   updateHud() {
-    this.hudText.setText(`Shield HP: ${this.baseHp}    Towers: ${this.towers.length}`);
+    this.hudText.setText(
+      `Shield HP: ${this.baseHp}    Towers: ${this.towers.length}    Kills: ${this.kills}`
+    );
   }
 
   // ---- drawing -----------------------------------------------------------

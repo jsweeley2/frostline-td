@@ -32,7 +32,7 @@ Following the staged build order from the spec:
 - [x] **Step 2** — Grid + shield generator
 - [x] **Step 3** — Enemy spawning + A* pathfinding (Light Scouts walk to base, damage it)
 - [x] **Step 4** — Tower placement (Sniper Towers, block validation, live rerouting)
-- [ ] Step 5 — Tower shooting + enemy death
+- [x] **Step 5** — Tower shooting + enemy death (targeting, tracers, range ring, kills)
 - [ ] Step 6 — Second enemy + second tower
 - [ ] Step 7 — Waves
 - [ ] Step 8 — Economy

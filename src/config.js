@@ -38,10 +38,12 @@ export const TOWERS = {
   sniper: {
     key: 'sniper',
     name: 'Sniper Tower',
+    kind: 'shooter', // fires at enemies in range
     cost: 50,
     range: 220,
     damage: 30,
     fireRateMs: 1500,
+    tracerColor: 0xfff2a8,
     bodyColor: COLORS.sniperBody,
     accentColor: COLORS.sniperAccent,
   },

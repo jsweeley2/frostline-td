@@ -18,6 +18,9 @@ export default class Tower {
     this.x = x;
     this.y = y;
 
+    // Combat state (used by shooter-kind towers in update()).
+    this.cooldown = 0;
+
     // Body: a rounded square filling most of the cell.
     this.body = scene.add
       .rectangle(x, y, TILE - 6, TILE - 6, stats.bodyColor)
@@ -26,6 +29,37 @@ export default class Tower {
 
     // Accent: a small barrel/dish so towers read as distinct from terrain.
     this.accent = scene.add.circle(x, y, TILE * 0.18, stats.accentColor).setDepth(4);
+  }
+
+  // Called every frame for shooter-kind towers. Picks the nearest enemy in
+  // range and, when reloaded, fires at it. The Sniper's slow fire rate is what
+  // makes it strong against fragile Light Scouts but weak against Heavy Walkers.
+  update(deltaMs, enemies) {
+    if (this.stats.kind !== 'shooter') return;
+
+    this.cooldown = Math.max(0, this.cooldown - deltaMs);
+    if (this.cooldown > 0) return;
+
+    const target = this.findTarget(enemies);
+    if (!target) return;
+
+    this.scene.fireTracer(this.x, this.y, target.x, target.y, this.stats.tracerColor);
+    target.takeDamage(this.stats.damage);
+    this.cooldown = this.stats.fireRateMs;
+  }
+
+  findTarget(enemies) {
+    let best = null;
+    let bestDist = Infinity;
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      const d = Math.hypot(e.x - this.x, e.y - this.y);
+      if (d <= this.stats.range && d < bestDist) {
+        bestDist = d;
+        best = e;
+      }
+    }
+    return best;
   }
 
   destroy() {
