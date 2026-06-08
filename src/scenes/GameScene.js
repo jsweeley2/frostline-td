@@ -1,15 +1,26 @@
 import Phaser from 'phaser';
-import { TILE, COLS, ROWS, GAME_WIDTH, GAME_HEIGHT, COLORS, ENEMIES } from '../config.js';
-import { cellCenter } from '../grid.js';
+import {
+  TILE,
+  COLS,
+  ROWS,
+  GAME_WIDTH,
+  GAME_HEIGHT,
+  COLORS,
+  ENEMIES,
+  TOWERS,
+} from '../config.js';
+import { cellCenter, pixelToCell, inBounds } from '../grid.js';
 import { level1 } from '../maps/level1.js';
 import { findPath } from '../pathfinding/astar.js';
 import Enemy from '../entities/Enemy.js';
+import Tower from '../entities/Tower.js';
 
 // ---------------------------------------------------------------------------
 // GameScene — the playfield.
-//   Step 2: static board (snowfield, entry, shield generator).
-//   Step 3: Light Scouts spawn at the entry and walk to the base via A*,
-//           damaging the shield generator on arrival.
+//   Step 2: static board.   Step 3: enemies + A* pathfinding.
+//   Step 4: place Sniper Towers (which act as walls). Placement is rejected if
+//           it would fully block the path to the base; valid placements reroute
+//           every live enemy in real time.
 // ---------------------------------------------------------------------------
 
 export default class GameScene extends Phaser.Scene {
@@ -21,9 +32,10 @@ export default class GameScene extends Phaser.Scene {
     this.level = level1;
     this.baseHp = level1.baseHp;
     this.enemies = [];
+    this.towers = [];
+    this.selectedTool = null; // currently selected tower type, or null
 
-    // Blocked-cell grid: false = walkable. Towers will flip cells to true in
-    // step 4. Stored row-major as blocked[row][col].
+    // Blocked-cell grid: false = walkable. Towers flip cells to true.
     this.blocked = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
 
     this.drawSnowfield();
@@ -34,7 +46,9 @@ export default class GameScene extends Phaser.Scene {
 
     this.drawSpawn();
     this.drawBase();
-    this.createDebugHud();
+
+    this.createInput();
+    this.createUi();
 
     this.startSpawning();
   }
@@ -45,18 +59,214 @@ export default class GameScene extends Phaser.Scene {
     return this.blocked[row][col];
   }
 
-  // Recompute the spawn->base route and redraw the debug overlay. Called once
-  // now; step 4 calls it again whenever a tower is added or removed.
-  recomputePath() {
-    this.path = findPath(
-      COLS,
-      ROWS,
-      (c, r) => this.isBlocked(c, r),
-      this.level.spawn,
-      this.level.base
-    );
-    this.drawPath();
+  isReserved(col, row) {
+    const s = this.level.spawn;
+    const b = this.level.base;
+    return (col === s.col && row === s.row) || (col === b.col && row === b.row);
   }
+
+  // Recompute the spawn->base route (for the overlay + new spawns) and reroute
+  // every live enemy from its current cell so a freshly-placed tower takes
+  // effect immediately without making anyone backtrack.
+  recomputePath() {
+    this.path = this.findPathFrom(this.level.spawn);
+    this.drawPath();
+
+    for (const enemy of this.enemies) {
+      const cell = pixelToCell(enemy.x, enemy.y);
+      const p = this.findPathFrom(cell);
+      if (p) enemy.setPath(p);
+    }
+  }
+
+  findPathFrom(start) {
+    return findPath(COLS, ROWS, (c, r) => this.isBlocked(c, r), start, this.level.base);
+  }
+
+  // ---- tower placement ---------------------------------------------------
+
+  // Can a tower go on this cell? It must be in bounds, not the spawn/base, not
+  // already occupied, and crucially must not seal off the path to the base.
+  canPlace(col, row) {
+    if (!inBounds(col, row)) return false;
+    if (this.isReserved(col, row)) return false;
+    if (this.isBlocked(col, row)) return false;
+
+    // Tentatively block it and confirm a path still exists.
+    this.blocked[row][col] = true;
+    const stillReachable = this.findPathFrom(this.level.spawn) !== null;
+    this.blocked[row][col] = false;
+    return stillReachable;
+  }
+
+  placeTower(col, row, stats) {
+    this.blocked[row][col] = true;
+    const tower = new Tower(this, col, row, stats);
+    this.towers.push(tower);
+    this.recomputePath();
+    this.updateHud();
+  }
+
+  // ---- spawning ----------------------------------------------------------
+
+  startSpawning() {
+    this.time.addEvent({
+      delay: 900,
+      repeat: 5,
+      callback: () => this.spawnEnemy(ENEMIES.lightScout),
+    });
+  }
+
+  spawnEnemy(stats) {
+    if (!this.path) return;
+    this.enemies.push(new Enemy(this, stats, this.path));
+  }
+
+  // ---- per-frame update --------------------------------------------------
+
+  update(time, delta) {
+    for (const enemy of this.enemies) enemy.update(delta);
+    this.enemies = this.enemies.filter((e) => e.alive);
+  }
+
+  // ---- enemy outcomes ----------------------------------------------------
+
+  onEnemyReachBase(enemy) {
+    this.baseHp = Math.max(0, this.baseHp - enemy.damage);
+    this.updateHud();
+  }
+
+  onEnemyKilled() {
+    // Credits/kill rewards land in step 8.
+  }
+
+  // ---- input -------------------------------------------------------------
+
+  createInput() {
+    // Phaser delivers pointer events only to the topmost interactive object,
+    // so UI buttons (higher depth) won't also trigger grid placement.
+    this.input.setTopOnly(true);
+
+    this.gridZone = this.add
+      .zone(0, 0, GAME_WIDTH, GAME_HEIGHT)
+      .setOrigin(0)
+      .setInteractive();
+
+    this.ghost = this.add
+      .rectangle(0, 0, TILE, TILE, COLORS.ghostOk, 0.45)
+      .setVisible(false)
+      .setDepth(6);
+
+    this.gridZone.on('pointermove', (pointer) => this.onGridHover(pointer));
+    this.gridZone.on('pointerout', () => this.ghost.setVisible(false));
+    this.gridZone.on('pointerdown', (pointer) => this.onGridClick(pointer));
+
+    // Right-click or Escape cancels the current tower selection.
+    this.input.mouse?.disableContextMenu();
+    this.input.on('pointerdown', (pointer) => {
+      if (pointer.rightButtonDown()) this.selectTool(null);
+    });
+    this.input.keyboard?.on('keydown-ESC', () => this.selectTool(null));
+  }
+
+  onGridHover(pointer) {
+    if (!this.selectedTool) {
+      this.ghost.setVisible(false);
+      return;
+    }
+    const { col, row } = pixelToCell(pointer.worldX, pointer.worldY);
+    if (!inBounds(col, row)) {
+      this.ghost.setVisible(false);
+      return;
+    }
+    const { x, y } = cellCenter(col, row);
+    const ok = this.canPlace(col, row);
+    this.ghost
+      .setPosition(x, y)
+      .setFillStyle(ok ? COLORS.ghostOk : COLORS.ghostBad, 0.45)
+      .setVisible(true);
+  }
+
+  onGridClick(pointer) {
+    if (!this.selectedTool) return;
+    const { col, row } = pixelToCell(pointer.worldX, pointer.worldY);
+    if (this.canPlace(col, row)) {
+      this.placeTower(col, row, this.selectedTool);
+      this.onGridHover(pointer); // refresh ghost (cell is now occupied)
+    }
+  }
+
+  // ---- UI ----------------------------------------------------------------
+
+  createUi() {
+    // Top bar.
+    this.add.rectangle(0, 0, GAME_WIDTH, 44, COLORS.uiPanel, 0.85).setOrigin(0).setDepth(8);
+
+    this.hudText = this.add
+      .text(12, 14, '', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '16px',
+        color: '#dfe9f5',
+        fontStyle: 'bold',
+      })
+      .setDepth(10);
+
+    this.sniperButton = this.makeToolButton(GAME_WIDTH - 180, 6, TOWERS.sniper);
+
+    this.hintText = this.add
+      .text(GAME_WIDTH - 190, 50, '', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '12px',
+        color: '#9fc0ff',
+        align: 'right',
+      })
+      .setOrigin(1, 0)
+      .setDepth(10);
+
+    this.updateHud();
+  }
+
+  makeToolButton(x, y, stats) {
+    const w = 168;
+    const h = 32;
+    const bg = this.add
+      .rectangle(x, y, w, h, COLORS.uiButton)
+      .setOrigin(0)
+      .setStrokeStyle(2, COLORS.uiButtonOn)
+      .setDepth(9)
+      .setInteractive({ useHandCursor: true });
+    const label = this.add
+      .text(x + w / 2, y + h / 2, stats.name, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '14px',
+        color: '#dfe9f5',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setDepth(10);
+
+    bg.on('pointerdown', () => {
+      this.selectTool(this.selectedTool === stats ? null : stats);
+    });
+
+    return { bg, label, stats };
+  }
+
+  selectTool(stats) {
+    this.selectedTool = stats;
+    const on = this.sniperButton.stats === stats;
+    this.sniperButton.bg.setFillStyle(on ? COLORS.uiButtonOn : COLORS.uiButton);
+    if (!stats) this.ghost.setVisible(false);
+    this.hintText.setText(
+      stats ? 'Click a cell to place.\nRight-click / Esc to cancel.' : ''
+    );
+  }
+
+  updateHud() {
+    this.hudText.setText(`Shield HP: ${this.baseHp}    Towers: ${this.towers.length}`);
+  }
+
+  // ---- drawing -----------------------------------------------------------
 
   drawPath() {
     const g = this.pathGraphics;
@@ -72,53 +282,6 @@ export default class GameScene extends Phaser.Scene {
     }
     g.strokePath();
   }
-
-  // ---- spawning ----------------------------------------------------------
-
-  // Step 3 is pre-waves, so just trickle a handful of Light Scouts onto the
-  // field to prove spawning + pathfinding + base damage all work. Real wave
-  // structure arrives in step 7.
-  startSpawning() {
-    let spawned = 0;
-    const total = 6;
-    this.time.addEvent({
-      delay: 900,
-      repeat: total - 1,
-      callback: () => {
-        spawned += 1;
-        this.spawnEnemy(ENEMIES.lightScout);
-      },
-    });
-  }
-
-  spawnEnemy(stats) {
-    if (!this.path) return;
-    const enemy = new Enemy(this, stats, this.path);
-    this.enemies.push(enemy);
-  }
-
-  // ---- per-frame update --------------------------------------------------
-
-  update(time, delta) {
-    for (const enemy of this.enemies) {
-      enemy.update(delta);
-    }
-    // Drop dead/arrived enemies from the active list.
-    this.enemies = this.enemies.filter((e) => e.alive);
-  }
-
-  // ---- enemy outcomes ----------------------------------------------------
-
-  onEnemyReachBase(enemy) {
-    this.baseHp = Math.max(0, this.baseHp - enemy.damage);
-    this.updateDebugHud();
-  }
-
-  onEnemyKilled() {
-    // Credits/kill rewards land in step 8.
-  }
-
-  // ---- drawing -----------------------------------------------------------
 
   drawSnowfield() {
     const g = this.add.graphics();
@@ -173,23 +336,5 @@ export default class GameScene extends Phaser.Scene {
         fontStyle: 'bold',
       })
       .setOrigin(0.5);
-  }
-
-  // Temporary on-screen readout so we can watch base HP fall. The real HUD
-  // (credits, wave, HP) is built in step 8/9.
-  createDebugHud() {
-    this.hudText = this.add
-      .text(10, 8, '', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '16px',
-        color: '#12386b',
-        fontStyle: 'bold',
-      })
-      .setDepth(10);
-    this.updateDebugHud();
-  }
-
-  updateDebugHud() {
-    this.hudText.setText(`Shield HP: ${this.baseHp}`);
   }
 }

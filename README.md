@@ -31,7 +31,7 @@ Following the staged build order from the spec:
 - [x] **Step 1** — Pipeline check: Phaser + Vite running locally and on Vercel (colored square)
 - [x] **Step 2** — Grid + shield generator
 - [x] **Step 3** — Enemy spawning + A* pathfinding (Light Scouts walk to base, damage it)
-- [ ] Step 4 — Tower placement (with path-blocking validation)
+- [x] **Step 4** — Tower placement (Sniper Towers, block validation, live rerouting)
 - [ ] Step 5 — Tower shooting + enemy death
 - [ ] Step 6 — Second enemy + second tower
 - [ ] Step 7 — Waves

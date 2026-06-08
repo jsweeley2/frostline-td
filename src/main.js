@@ -21,5 +21,7 @@ const config = {
   scene: [GameScene],
 };
 
-// eslint-disable-next-line no-new
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+// Debug handle so the running game can be inspected from the console.
+if (typeof window !== 'undefined') window.__GAME__ = game;

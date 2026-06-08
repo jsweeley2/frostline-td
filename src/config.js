@@ -22,6 +22,29 @@ export const COLORS = {
   text: 0x12386b, // dark blue text
   path: 0x6f8fbf, // debug path overlay
   lightScout: 0xffb24d, // Light Scout enemy (orange)
+  sniperBody: 0x3b5b8c, // Sniper Tower body (steel blue)
+  sniperAccent: 0xbcd4ff, // Sniper Tower barrel
+  ghostOk: 0x39c06a, // valid placement preview (green)
+  ghostBad: 0xe05a47, // invalid placement preview (red)
+  uiPanel: 0x0b1320, // UI bar background
+  uiButton: 0x1c2c46, // UI button
+  uiButtonOn: 0x2b7de9, // selected UI button
+};
+
+// Tower stats. Cost is wired up in step 8; range/damage/fire rate in step 5.
+//   range     = pixels
+//   fireRateMs = ms between shots
+export const TOWERS = {
+  sniper: {
+    key: 'sniper',
+    name: 'Sniper Tower',
+    cost: 50,
+    range: 220,
+    damage: 30,
+    fireRateMs: 1500,
+    bodyColor: COLORS.sniperBody,
+    accentColor: COLORS.sniperAccent,
+  },
 };
 
 // Enemy stats. Tuned for the slow, cerebral pace; refined in the step-10 pass.
