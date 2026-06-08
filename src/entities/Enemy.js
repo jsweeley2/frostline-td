@@ -18,13 +18,20 @@ export default class Enemy {
     this.speed = stats.speed;
     this.damage = stats.damage;
     this.alive = true;
+    this.stunTimer = 0; // ms of immobilization remaining (Tripwire Hook)
 
     const start = cellCenter(path[0].col, path[0].row);
     this.x = start.x;
     this.y = start.y;
 
-    this.sprite = scene.add.circle(this.x, this.y, stats.radius, stats.color);
-    this.sprite.setStrokeStyle(2, 0x8a5a16);
+    // Light Scouts are circles, Heavy Walkers are squares — distinct silhouettes
+    // until real sprites arrive. Depth 2 keeps them above ground traps (depth 1).
+    const r = stats.radius;
+    this.sprite =
+      stats.shape === 'square'
+        ? scene.add.rectangle(this.x, this.y, r * 2, r * 2, stats.color)
+        : scene.add.circle(this.x, this.y, r, stats.color);
+    this.sprite.setStrokeStyle(2, 0x2b2b3a).setDepth(2);
 
     this.setPath(path);
   }
@@ -39,6 +46,12 @@ export default class Enemy {
 
   update(deltaMs) {
     if (!this.alive) return;
+
+    // Immobilized (e.g. snagged by a Tripwire Hook): hold position.
+    if (this.stunTimer > 0) {
+      this.stunTimer -= deltaMs;
+      return;
+    }
 
     if (this.pathIndex >= this.path.length) {
       this.reachBase();
@@ -71,6 +84,11 @@ export default class Enemy {
     if (!this.alive) return;
     this.hp -= amount;
     if (this.hp <= 0) this.die();
+  }
+
+  immobilize(ms) {
+    if (!this.alive) return;
+    this.stunTimer = Math.max(this.stunTimer, ms);
   }
 
   reachBase() {

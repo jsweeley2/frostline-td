@@ -33,7 +33,7 @@ Following the staged build order from the spec:
 - [x] **Step 3** — Enemy spawning + A* pathfinding (Light Scouts walk to base, damage it)
 - [x] **Step 4** — Tower placement (Sniper Towers, block validation, live rerouting)
 - [x] **Step 5** — Tower shooting + enemy death (targeting, tracers, range ring, kills)
-- [ ] Step 6 — Second enemy + second tower
+- [x] **Step 6** — Heavy Walker enemy + Tripwire Hook trap (type interactions)
 - [ ] Step 7 — Waves
 - [ ] Step 8 — Economy
 - [ ] Step 9 — Win / lose conditions

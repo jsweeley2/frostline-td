@@ -29,6 +29,9 @@ export const COLORS = {
   uiPanel: 0x0b1320, // UI bar background
   uiButton: 0x1c2c46, // UI button
   uiButtonOn: 0x2b7de9, // selected UI button
+  heavyWalker: 0x7a6f9b, // Heavy Walker enemy (slate purple)
+  tripwire: 0xf2c14e, // Tripwire Hook trap (hazard yellow)
+  tripwireArm: 0x8a6d1f, // Tripwire when on cooldown (dimmed)
 };
 
 // Tower stats. Cost is wired up in step 8; range/damage/fire rate in step 5.
@@ -44,8 +47,22 @@ export const TOWERS = {
     damage: 30,
     fireRateMs: 1500,
     tracerColor: 0xfff2a8,
+    blocks: true, // a structure: enemies must route around it
     bodyColor: COLORS.sniperBody,
     accentColor: COLORS.sniperAccent,
+  },
+  tripwire: {
+    key: 'tripwire',
+    name: 'Tripwire Hook',
+    kind: 'trap', // a ground trap: enemies walk over it
+    cost: 20,
+    blocks: false, // does NOT block the path
+    damage: 80, // heavy hit to whatever trips it
+    immobilizeMs: 1000, // briefly freezes the victim
+    cooldownMs: 1400, // time to re-arm after triggering
+    triggerRadius: 18, // how close a victim must be to trip it
+    color: COLORS.tripwire,
+    armColor: COLORS.tripwireArm,
   },
 };
 
@@ -54,11 +71,25 @@ export const TOWERS = {
 //   damage = HP removed from the shield generator if it reaches the base
 export const ENEMIES = {
   lightScout: {
+    key: 'lightScout',
     name: 'Light Scout',
     hp: 30,
     speed: 115,
     damage: 5,
     radius: 9,
+    shape: 'circle', // nimble scout
     color: COLORS.lightScout,
+    triggersTripwire: false, // too fast/light to trip the hook
+  },
+  heavyWalker: {
+    key: 'heavyWalker',
+    name: 'Heavy Walker',
+    hp: 200,
+    speed: 45,
+    damage: 25,
+    radius: 15,
+    shape: 'square', // bulky four-legged walker
+    color: COLORS.heavyWalker,
+    triggersTripwire: true, // heavy enough to set off the hook
   },
 };

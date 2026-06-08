@@ -36,8 +36,11 @@ export default class GameScene extends Phaser.Scene {
     this.kills = 0;
     this.selectedTool = null; // currently selected tower type, or null
 
-    // Blocked-cell grid: false = walkable. Towers flip cells to true.
+    // Two grids:
+    //   blocked  — pathfinding walls (only structure towers set this true).
+    //   occupied — any tower (wall OR trap), so we never stack two on a cell.
     this.blocked = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+    this.occupied = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
 
     this.drawSnowfield();
     this.drawGridLines();
@@ -58,6 +61,10 @@ export default class GameScene extends Phaser.Scene {
 
   isBlocked(col, row) {
     return this.blocked[row][col];
+  }
+
+  isOccupied(col, row) {
+    return this.occupied[row][col];
   }
 
   isReserved(col, row) {
@@ -86,35 +93,54 @@ export default class GameScene extends Phaser.Scene {
 
   // ---- tower placement ---------------------------------------------------
 
-  // Can a tower go on this cell? It must be in bounds, not the spawn/base, not
-  // already occupied, and crucially must not seal off the path to the base.
-  canPlace(col, row) {
+  // Can this tower go on this cell? Must be in bounds, not the spawn/base, and
+  // not already occupied. A wall-type tower additionally must not seal off the
+  // path to the base; a trap never blocks, so it skips that check.
+  canPlace(col, row, stats) {
     if (!inBounds(col, row)) return false;
     if (this.isReserved(col, row)) return false;
-    if (this.isBlocked(col, row)) return false;
+    if (this.isOccupied(col, row)) return false;
 
-    // Tentatively block it and confirm a path still exists.
-    this.blocked[row][col] = true;
-    const stillReachable = this.findPathFrom(this.level.spawn) !== null;
-    this.blocked[row][col] = false;
-    return stillReachable;
+    if (stats && stats.blocks) {
+      // Tentatively block it and confirm a path still exists.
+      this.blocked[row][col] = true;
+      const stillReachable = this.findPathFrom(this.level.spawn) !== null;
+      this.blocked[row][col] = false;
+      return stillReachable;
+    }
+    return true;
   }
 
   placeTower(col, row, stats) {
-    this.blocked[row][col] = true;
+    this.occupied[row][col] = true;
     const tower = new Tower(this, col, row, stats);
     this.towers.push(tower);
-    this.recomputePath();
+    if (stats.blocks) {
+      this.blocked[row][col] = true;
+      this.recomputePath();
+    }
     this.updateHud();
   }
 
   // ---- spawning ----------------------------------------------------------
 
+  // Step 6 is still pre-waves: trickle a mix of both enemy types so we can see
+  // both towers and the type interactions. Real wave structure arrives in step 7.
   startSpawning() {
+    const script = [
+      ENEMIES.lightScout,
+      ENEMIES.lightScout,
+      ENEMIES.lightScout,
+      ENEMIES.heavyWalker,
+      ENEMIES.heavyWalker,
+      ENEMIES.lightScout,
+      ENEMIES.heavyWalker,
+    ];
+    let i = 0;
     this.time.addEvent({
-      delay: 900,
-      repeat: 5,
-      callback: () => this.spawnEnemy(ENEMIES.lightScout),
+      delay: 1200,
+      repeat: script.length - 1,
+      callback: () => this.spawnEnemy(script[i++]),
     });
   }
 
@@ -209,7 +235,7 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
     const { x, y } = cellCenter(col, row);
-    const ok = this.canPlace(col, row);
+    const ok = this.canPlace(col, row, this.selectedTool);
     const tint = ok ? COLORS.ghostOk : COLORS.ghostBad;
     this.ghost.setPosition(x, y).setFillStyle(tint, 0.45).setVisible(true);
 
@@ -228,7 +254,7 @@ export default class GameScene extends Phaser.Scene {
   onGridClick(pointer) {
     if (!this.selectedTool) return;
     const { col, row } = pixelToCell(pointer.worldX, pointer.worldY);
-    if (this.canPlace(col, row)) {
+    if (this.canPlace(col, row, this.selectedTool)) {
       this.placeTower(col, row, this.selectedTool);
       this.onGridHover(pointer); // refresh ghost (cell is now occupied)
     }
@@ -249,10 +275,14 @@ export default class GameScene extends Phaser.Scene {
       })
       .setDepth(10);
 
-    this.sniperButton = this.makeToolButton(GAME_WIDTH - 180, 6, TOWERS.sniper);
+    // Tool buttons, laid out right-to-left along the top bar.
+    this.toolButtons = [
+      this.makeToolButton(GAME_WIDTH - 180, 6, TOWERS.sniper),
+      this.makeToolButton(GAME_WIDTH - 356, 6, TOWERS.tripwire),
+    ];
 
     this.hintText = this.add
-      .text(GAME_WIDTH - 190, 50, '', {
+      .text(GAME_WIDTH - 366, 50, '', {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '12px',
         color: '#9fc0ff',
@@ -274,9 +304,9 @@ export default class GameScene extends Phaser.Scene {
       .setDepth(9)
       .setInteractive({ useHandCursor: true });
     const label = this.add
-      .text(x + w / 2, y + h / 2, stats.name, {
+      .text(x + w / 2, y + h / 2, `${stats.name}  (${stats.cost})`, {
         fontFamily: 'system-ui, sans-serif',
-        fontSize: '14px',
+        fontSize: '13px',
         color: '#dfe9f5',
         fontStyle: 'bold',
       })
@@ -292,8 +322,9 @@ export default class GameScene extends Phaser.Scene {
 
   selectTool(stats) {
     this.selectedTool = stats;
-    const on = this.sniperButton.stats === stats;
-    this.sniperButton.bg.setFillStyle(on ? COLORS.uiButtonOn : COLORS.uiButton);
+    for (const btn of this.toolButtons) {
+      btn.bg.setFillStyle(btn.stats === stats ? COLORS.uiButtonOn : COLORS.uiButton);
+    }
     if (!stats) {
       this.ghost.setVisible(false);
       this.ghostRange.setVisible(false);

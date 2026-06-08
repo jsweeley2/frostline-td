@@ -2,9 +2,11 @@ import { TILE } from '../config.js';
 import { cellCenter } from '../grid.js';
 
 // ---------------------------------------------------------------------------
-// Tower — occupies one grid cell and acts as a wall (enemies route around it).
-// Step 4 just places and draws it; shooting is added in step 5. Built generic
-// over a stats object so the Tripwire Hook (step 6) reuses the same class.
+// Tower — occupies one grid cell. Two kinds, driven by the stats object:
+//   'shooter' (Sniper Tower): a wall that fires at enemies in range.
+//   'trap'    (Tripwire Hook): a low ground hazard enemies walk over. It does
+//             NOT block the path; it triggers on heavy enemies, hitting and
+//             briefly immobilizing them, then re-arms after a cooldown.
 // ---------------------------------------------------------------------------
 
 export default class Tower {
@@ -18,25 +20,42 @@ export default class Tower {
     this.x = x;
     this.y = y;
 
-    // Combat state (used by shooter-kind towers in update()).
-    this.cooldown = 0;
+    this.cooldown = 0; // shared timer: reload (shooter) / re-arm (trap)
+    this.parts = []; // graphics objects to clean up on destroy
 
-    // Body: a rounded square filling most of the cell.
-    this.body = scene.add
-      .rectangle(x, y, TILE - 6, TILE - 6, stats.bodyColor)
-      .setStrokeStyle(2, 0x0c1d33)
-      .setDepth(3);
-
-    // Accent: a small barrel/dish so towers read as distinct from terrain.
-    this.accent = scene.add.circle(x, y, TILE * 0.18, stats.accentColor).setDepth(4);
+    if (stats.kind === 'trap') this.drawTrap();
+    else this.drawStructure();
   }
 
-  // Called every frame for shooter-kind towers. Picks the nearest enemy in
-  // range and, when reloaded, fires at it. The Sniper's slow fire rate is what
-  // makes it strong against fragile Light Scouts but weak against Heavy Walkers.
-  update(deltaMs, enemies) {
-    if (this.stats.kind !== 'shooter') return;
+  drawStructure() {
+    const body = this.scene.add
+      .rectangle(this.x, this.y, TILE - 6, TILE - 6, this.stats.bodyColor)
+      .setStrokeStyle(2, 0x0c1d33)
+      .setDepth(3);
+    const accent = this.scene.add
+      .circle(this.x, this.y, TILE * 0.18, this.stats.accentColor)
+      .setDepth(4);
+    this.parts.push(body, accent);
+  }
 
+  // A flat hazard marker at ground level (depth 1, under enemies at depth 2).
+  drawTrap() {
+    this.trapMarker = this.scene.add
+      .rectangle(this.x, this.y, TILE - 12, TILE - 12, this.stats.color, 0.85)
+      .setStrokeStyle(2, this.stats.armColor)
+      .setAngle(45)
+      .setDepth(1);
+    this.parts.push(this.trapMarker);
+  }
+
+  update(deltaMs, enemies) {
+    if (this.stats.kind === 'shooter') this.updateShooter(deltaMs, enemies);
+    else if (this.stats.kind === 'trap') this.updateTrap(deltaMs, enemies);
+  }
+
+  // Picks the nearest enemy in range and fires when reloaded. The slow fire
+  // rate is what makes the Sniper strong vs fragile Scouts but weak vs Walkers.
+  updateShooter(deltaMs, enemies) {
     this.cooldown = Math.max(0, this.cooldown - deltaMs);
     if (this.cooldown > 0) return;
 
@@ -62,8 +81,39 @@ export default class Tower {
     return best;
   }
 
+  // Triggers on the first tripwire-triggering enemy standing on the trap, then
+  // re-arms. Light Scouts pass over harmlessly (triggersTripwire is false).
+  updateTrap(deltaMs, enemies) {
+    if (this.cooldown > 0) {
+      this.cooldown = Math.max(0, this.cooldown - deltaMs);
+      if (this.cooldown === 0) this.setArmed(true);
+      return;
+    }
+
+    for (const e of enemies) {
+      if (!e.alive || !e.stats.triggersTripwire) continue;
+      const d = Math.hypot(e.x - this.x, e.y - this.y);
+      if (d <= this.stats.triggerRadius) {
+        e.takeDamage(this.stats.damage);
+        e.immobilize(this.stats.immobilizeMs);
+        this.cooldown = this.stats.cooldownMs;
+        this.setArmed(false);
+        this.scene.fireTracer(this.x, this.y - 1, this.x, this.y + 1, 0xffffff);
+        break;
+      }
+    }
+  }
+
+  setArmed(armed) {
+    if (!this.trapMarker) return;
+    this.trapMarker.setFillStyle(
+      armed ? this.stats.color : this.stats.armColor,
+      armed ? 0.85 : 0.5
+    );
+  }
+
   destroy() {
-    this.body.destroy();
-    this.accent.destroy();
+    for (const p of this.parts) p.destroy();
+    this.parts = [];
   }
 }
