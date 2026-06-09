@@ -38,4 +38,25 @@ Following the staged build order from the spec:
 - [x] **Step 8** — Economy (starting credits, kill rewards, tower costs enforced)
 - [x] **Controls** — speed toggle (1x/2x/3x), auto-start, rush-next-wave (overlapping waves)
 - [x] **Step 9** — Win / lose conditions (Game Over + Victory screens, Play Again)
+- [x] **Expansion** — 3 new enemies + 3 new towers + UI layout refactor (see below)
 - [ ] Step 10 — Polish pass (balance tuning)
+
+## Enemies
+
+| Enemy | Traits | Counter |
+|-------|--------|---------|
+| Light Scout | fast, fragile | Sniper / Tesla |
+| Runner | extremely fast, paper HP, swarms | Frost + AoE / Tesla |
+| Heavy Walker | slow, high HP, trips hooks | Tripwire / Plasma |
+| Disruptor | EMP that disables a nearby tower for a few seconds | kill it fast (Sniper/Plasma) |
+| Juggernaut | boss: huge HP, devastating to the base, trips hooks | Tripwire chains + Frost + focus fire |
+
+## Towers
+
+| Tower | Cost | Ability |
+|-------|------|---------|
+| Sniper Tower | 50 | long range, high single-target, slow reload |
+| Tripwire Hook | 20 | ground trap: big hit + freeze on heavy units, ignores fast ones |
+| Frost Tower | 40 | slows + lightly damages every enemy in range (force multiplier) |
+| Plasma Mortar | 70 | area-of-effect splash damage (anti-swarm) |
+| Tesla Coil | 85 | fast chain lightning that arcs between several enemies |

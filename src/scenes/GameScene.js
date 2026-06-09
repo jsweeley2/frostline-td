@@ -5,9 +5,16 @@ import {
   ROWS,
   GAME_WIDTH,
   GAME_HEIGHT,
+  GRID_X,
+  GRID_Y,
+  GRID_W,
+  GRID_H,
+  TOP_BAR_H,
+  BOTTOM_BAR_H,
   COLORS,
   ENEMIES,
   TOWERS,
+  TOWER_ORDER,
   STARTING_CREDITS,
   SPEED_STEPS,
   AUTO_START_DELAY_MS,
@@ -248,6 +255,30 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
+  // Plasma splash flash: a filled circle that expands and fades.
+  explosion(x, y, radius, color) {
+    const c = this.add.circle(x, y, radius, color, 0.4).setDepth(5);
+    this.tweens.add({
+      targets: c,
+      scale: { from: 0.5, to: 1.1 },
+      alpha: 0,
+      duration: 220,
+      onComplete: () => c.destroy(),
+    });
+  }
+
+  // Disruptor EMP: an expanding ring where a tower got knocked offline.
+  empPulse(x, y) {
+    const ring = this.add.circle(x, y, 14).setStrokeStyle(3, COLORS.emp, 0.9).setDepth(5);
+    this.tweens.add({
+      targets: ring,
+      scale: { from: 0.4, to: 2.4 },
+      alpha: 0,
+      duration: 360,
+      onComplete: () => ring.destroy(),
+    });
+  }
+
   // ---- enemy outcomes ----------------------------------------------------
 
   onEnemyReachBase(enemy) {
@@ -270,7 +301,7 @@ export default class GameScene extends Phaser.Scene {
     this.input.setTopOnly(true);
 
     this.gridZone = this.add
-      .zone(0, 0, GAME_WIDTH, GAME_HEIGHT)
+      .zone(GRID_X, GRID_Y, GRID_W, GRID_H)
       .setOrigin(0)
       .setInteractive();
 
@@ -342,44 +373,55 @@ export default class GameScene extends Phaser.Scene {
   // ---- UI ----------------------------------------------------------------
 
   createUi() {
-    // Top bar.
-    this.add.rectangle(0, 0, GAME_WIDTH, 44, COLORS.uiPanel, 0.85).setOrigin(0).setDepth(8);
+    // Top bar (HUD + controls) and bottom bar (tower palette).
+    this.add.rectangle(0, 0, GAME_WIDTH, TOP_BAR_H, COLORS.uiPanel, 0.92).setOrigin(0).setDepth(8);
+    const bottomY = GRID_Y + GRID_H;
+    this.add
+      .rectangle(0, bottomY, GAME_WIDTH, BOTTOM_BAR_H, COLORS.uiPanel, 0.92)
+      .setOrigin(0)
+      .setDepth(8);
 
     this.hudText = this.add
-      .text(12, 15, '', {
+      .text(14, 16, '', {
         fontFamily: 'system-ui, sans-serif',
-        fontSize: '14px',
+        fontSize: '15px',
         color: '#dfe9f5',
         fontStyle: 'bold',
       })
       .setDepth(10);
 
-    // Control buttons: speed, auto-start, and rush-the-next-wave.
-    this.speedBtn = this.makeButton(360, 6, 72, '', COLORS.uiButton, '#dfe9f5', () =>
+    // Control buttons: speed, auto-start, rush-the-next-wave (top-right).
+    this.speedBtn = this.makeButton(608, 8, 78, 32, '', COLORS.uiButton, '#dfe9f5', () =>
       this.cycleSpeed()
     );
-    this.autoBtn = this.makeButton(440, 6, 110, '', COLORS.uiButton, '#dfe9f5', () =>
+    this.autoBtn = this.makeButton(694, 8, 110, 32, '', COLORS.uiButton, '#dfe9f5', () =>
       this.toggleAutoStart()
     );
-    this.nextWaveBtn = this.makeButton(558, 6, 128, '', COLORS.ghostOk, '#08240f', () =>
+    this.nextWaveBtn = this.makeButton(812, 8, 138, 32, '', COLORS.ghostOk, '#08240f', () =>
       this.launchWave()
     );
 
-    // Tower tool buttons (right side).
-    this.toolButtons = [
-      this.makeToolButton(824, 6, 124, TOWERS.sniper),
-      this.makeToolButton(692, 6, 124, TOWERS.tripwire),
-    ];
-
+    // Ability hint line at the top of the bottom bar.
     this.hintText = this.add
-      .text(GAME_WIDTH - 12, 50, '', {
+      .text(GAME_WIDTH / 2, bottomY + 7, '', {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '12px',
         color: '#9fc0ff',
-        align: 'right',
+        align: 'center',
+        wordWrap: { width: GAME_WIDTH - 40 },
       })
-      .setOrigin(1, 0)
+      .setOrigin(0.5, 0)
       .setDepth(10);
+
+    // Tower palette across the bottom bar.
+    const n = TOWER_ORDER.length;
+    const margin = 12;
+    const gap = 10;
+    const w = (GAME_WIDTH - margin * 2 - gap * (n - 1)) / n;
+    const btnY = bottomY + 30;
+    this.toolButtons = TOWER_ORDER.map((key, i) =>
+      this.makeToolButton(margin + i * (w + gap), btnY, w, 46, TOWERS[key])
+    );
 
     this.updateSpeedBtn();
     this.updateAutoBtn();
@@ -387,8 +429,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   // Generic labeled button. Returns { bg, label }.
-  makeButton(x, y, w, text, fill, textColor, onClick) {
-    const h = 32;
+  makeButton(x, y, w, h, text, fill, textColor, onClick) {
     const bg = this.add
       .rectangle(x, y, w, h, fill)
       .setOrigin(0)
@@ -408,8 +449,7 @@ export default class GameScene extends Phaser.Scene {
     return { bg, label };
   }
 
-  makeToolButton(x, y, w, stats) {
-    const h = 32;
+  makeToolButton(x, y, w, h, stats) {
     const bg = this.add
       .rectangle(x, y, w, h, COLORS.uiButton)
       .setOrigin(0)
@@ -417,11 +457,13 @@ export default class GameScene extends Phaser.Scene {
       .setDepth(9)
       .setInteractive({ useHandCursor: true });
     const label = this.add
-      .text(x + w / 2, y + h / 2, `${stats.name} (${stats.cost})`, {
+      .text(x + w / 2, y + h / 2, `${stats.name}\nCost ${stats.cost}`, {
         fontFamily: 'system-ui, sans-serif',
-        fontSize: '12px',
+        fontSize: '13px',
         color: '#dfe9f5',
         fontStyle: 'bold',
+        align: 'center',
+        lineSpacing: 2,
       })
       .setOrigin(0.5)
       .setDepth(10);
@@ -442,9 +484,7 @@ export default class GameScene extends Phaser.Scene {
       this.ghost.setVisible(false);
       this.ghostRange.setVisible(false);
     }
-    this.hintText.setText(
-      stats ? 'Click a cell to place.\nRight-click / Esc to cancel.' : ''
-    );
+    this.hintText.setText(stats ? stats.desc : '');
   }
 
   // ---- control buttons ---------------------------------------------------
@@ -527,7 +567,7 @@ export default class GameScene extends Phaser.Scene {
       for (let col = 0; col < COLS; col++) {
         const shade = (col + row) % 2 === 0 ? COLORS.snow : COLORS.snowAlt;
         g.fillStyle(shade, 1);
-        g.fillRect(col * TILE, row * TILE, TILE, TILE);
+        g.fillRect(GRID_X + col * TILE, GRID_Y + row * TILE, TILE, TILE);
       }
     }
   }
@@ -536,10 +576,10 @@ export default class GameScene extends Phaser.Scene {
     const g = this.add.graphics();
     g.lineStyle(1, COLORS.grid, 0.6);
     for (let col = 0; col <= COLS; col++) {
-      g.lineBetween(col * TILE, 0, col * TILE, GAME_HEIGHT);
+      g.lineBetween(GRID_X + col * TILE, GRID_Y, GRID_X + col * TILE, GRID_Y + GRID_H);
     }
     for (let row = 0; row <= ROWS; row++) {
-      g.lineBetween(0, row * TILE, GAME_WIDTH, row * TILE);
+      g.lineBetween(GRID_X, GRID_Y + row * TILE, GRID_X + GRID_W, GRID_Y + row * TILE);
     }
   }
 
