@@ -73,10 +73,10 @@ export const TOWERS = {
     key: 'sniper',
     name: 'Sniper Tower',
     kind: 'shooter', // fires at enemies in range
-    desc: 'High single-target damage, slow reload. One-shots Scouts.',
+    desc: 'Precise single-target damage, slow reload. Best against light units.',
     cost: 50,
     range: 170,
-    damage: 30,
+    damage: 22,
     fireRateMs: 2000,
     tracerColor: 0xfff2a8,
     blocks: true, // a structure: enemies must route around it
