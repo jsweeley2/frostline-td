@@ -11,10 +11,10 @@ import { cellCenter } from '../grid.js';
 // ---------------------------------------------------------------------------
 
 export default class Enemy {
-  constructor(scene, stats, path) {
+  constructor(scene, stats, path, hpScale = 1) {
     this.scene = scene;
     this.stats = stats;
-    this.hp = stats.hp;
+    this.hp = Math.round(stats.hp * hpScale); // scaled up in endless mode
     this.speed = stats.speed;
     this.damage = stats.damage;
     this.alive = true;

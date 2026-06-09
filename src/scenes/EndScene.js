@@ -15,11 +15,11 @@ export default class EndScene extends Phaser.Scene {
   }
 
   init(data) {
-    this.result = data || { win: false, wave: 0, kills: 0 };
+    this.result = data || { win: false, wave: 0, kills: 0, endless: false };
   }
 
   create() {
-    const { win, wave, kills } = this.result;
+    const { win, wave, kills, endless } = this.result;
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
 
@@ -40,25 +40,26 @@ export default class EndScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.add
-      .text(
-        cx,
-        cy - 44,
-        win
-          ? `You held the shield through all ${WAVES.length} waves.`
-          : `The shield generator fell on wave ${wave} of ${WAVES.length}.`,
-        {
-          fontFamily: 'system-ui, sans-serif',
-          fontSize: '16px',
-          color: '#dfe9f5',
-          align: 'center',
-          wordWrap: { width: 420 },
-        }
-      )
-      .setOrigin(0.5);
+    let subtitle;
+    if (win) subtitle = `You held the shield through all ${WAVES.length} waves.`;
+    else if (endless) subtitle = `Endless mode: you reached wave ${wave}.`;
+    else subtitle = `The shield generator fell on wave ${wave} of ${WAVES.length}.`;
 
     this.add
-      .text(cx, cy + 6, `Waves reached: ${wave} / ${WAVES.length}      Kills: ${kills}`, {
+      .text(cx, cy - 44, subtitle, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '16px',
+        color: '#dfe9f5',
+        align: 'center',
+        wordWrap: { width: 420 },
+      })
+      .setOrigin(0.5);
+
+    const recap = endless
+      ? `Waves survived: ${wave}      Kills: ${kills}`
+      : `Waves reached: ${wave} / ${WAVES.length}      Kills: ${kills}`;
+    this.add
+      .text(cx, cy + 6, recap, {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '15px',
         color: '#9fc0ff',

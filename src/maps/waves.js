@@ -38,3 +38,28 @@ export const WAVES = [
   { groups: [jugg(3, 2000), walker(8, 1000, 600), disruptor(4, 1300, 400)] }, // 19
   { groups: [jugg(4, 1800), disruptor(5, 1200, 500), walker(8, 950, 700), runner(24, 240, 1000)] }, // 20 — finale
 ];
+
+// Endless mode: once the 20 hand-built waves are done, waves are generated
+// procedurally and escalate forever. Each tier past the campaign adds more of
+// everything, tightens the spawn gaps, and scales enemy HP up so even cheap
+// units stay threatening. There is no victory: you survive as long as you can.
+export function generateEndlessWave(n) {
+  const t = n - WAVES.length; // 1, 2, 3, ... tiers past the campaign
+  const clamp = (v, lo) => Math.max(lo, Math.round(v));
+  return {
+    hpScale: 1 + t * 0.12, // +12% enemy HP per tier
+    groups: [
+      runner(12 + t * 3, clamp(320 - t * 8, 170)),
+      scout(8 + t * 2, clamp(520 - t * 10, 300), 400),
+      walker(3 + Math.floor(t * 0.8), clamp(1300 - t * 30, 700), 400),
+      disruptor(2 + Math.floor(t / 2), clamp(1500 - t * 20, 900), 500),
+      jugg(1 + Math.floor(t / 3), clamp(2400 - t * 30, 1300), 700),
+    ],
+  };
+}
+
+// Returns the wave definition for wave number n (1-based): a hand-built wave if
+// within the campaign, otherwise a generated endless wave.
+export function getWave(n) {
+  return n <= WAVES.length ? WAVES[n - 1] : generateEndlessWave(n);
+}

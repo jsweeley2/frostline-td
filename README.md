@@ -39,7 +39,15 @@ Following the staged build order from the spec:
 - [x] **Controls** — speed toggle (1x/2x/3x), auto-start, rush-next-wave (overlapping waves)
 - [x] **Step 9** — Win / lose conditions (Game Over + Victory screens, Play Again)
 - [x] **Expansion** — 3 new enemies + 3 new towers + UI layout refactor (see below)
+- [x] **Endless mode** — Campaign/Endless toggle; infinite procedurally-scaled waves
 - [ ] Step 10 — Polish pass (balance tuning)
+
+## Modes
+
+- **Campaign** — the 20 hand-built waves; survive all of them to win.
+- **Endless** — waves never stop. After wave 20 they're generated on the fly with
+  growing counts, tighter spawns, and scaling enemy HP. No victory: see how far
+  you can get. Toggle with the **Mode** button before/while playing.
 
 ## Enemies
 

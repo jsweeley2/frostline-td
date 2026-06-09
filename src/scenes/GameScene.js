@@ -21,7 +21,7 @@ import {
 } from '../config.js';
 import { cellCenter, pixelToCell, inBounds } from '../grid.js';
 import { level1 } from '../maps/level1.js';
-import { WAVES } from '../maps/waves.js';
+import { WAVES, getWave } from '../maps/waves.js';
 import { findPath } from '../pathfinding/astar.js';
 import Enemy from '../entities/Enemy.js';
 import Tower from '../entities/Tower.js';
@@ -61,6 +61,7 @@ export default class GameScene extends Phaser.Scene {
     this.autoStartPending = false; // a queued auto-start timer is in flight
 
     this.gameEnded = false; // win or lose reached
+    this.endless = false; // Campaign (20 waves) vs Endless (infinite)
 
     // Two grids:
     //   blocked  — pathfinding walls (only structure towers set this true).
@@ -162,10 +163,12 @@ export default class GameScene extends Phaser.Scene {
   // next wave in early, and waves can overlap.
   launchWave() {
     if (this.allWavesCleared) return;
-    if (this.currentWave >= WAVES.length) return;
+    // Campaign stops at the last hand-built wave; Endless never stops.
+    if (!this.endless && this.currentWave >= WAVES.length) return;
 
     this.currentWave += 1;
-    const wave = WAVES[this.currentWave - 1];
+    const wave = getWave(this.currentWave);
+    const hpScale = wave.hpScale || 1;
     let cursor = 0; // ms offset from wave start
     for (const group of wave.groups) {
       cursor += group.startDelay || 0;
@@ -175,7 +178,7 @@ export default class GameScene extends Phaser.Scene {
         this.pendingSpawns += 1;
         this.time.delayedCall(at, () => {
           this.pendingSpawns -= 1;
-          this.spawnEnemy(stats);
+          this.spawnEnemy(stats, hpScale);
         });
       }
       cursor += group.count * group.gap;
@@ -189,12 +192,13 @@ export default class GameScene extends Phaser.Scene {
   updateWaves() {
     if (this.allWavesCleared) return;
 
-    const allLaunched = this.currentWave >= WAVES.length;
+    // Endless mode never "completes"; only Campaign can be won.
+    const allLaunched = !this.endless && this.currentWave >= WAVES.length;
 
     if (allLaunched && !this.waveInProgress) {
       this.allWavesCleared = true;
       this.refreshWaveUi();
-      this.endGame(true); // survived every wave
+      this.endGame(true); // survived every campaign wave
       return;
     }
 
@@ -221,12 +225,13 @@ export default class GameScene extends Phaser.Scene {
       win,
       wave: this.currentWave,
       kills: this.kills,
+      endless: this.endless,
     });
   }
 
-  spawnEnemy(stats) {
+  spawnEnemy(stats, hpScale = 1) {
     if (!this.path) return;
-    this.enemies.push(new Enemy(this, stats, this.path));
+    this.enemies.push(new Enemy(this, stats, this.path, hpScale));
   }
 
   // ---- per-frame update --------------------------------------------------
@@ -390,14 +395,17 @@ export default class GameScene extends Phaser.Scene {
       })
       .setDepth(10);
 
-    // Control buttons: speed, auto-start, rush-the-next-wave (top-right).
-    this.speedBtn = this.makeButton(608, 8, 78, 32, '', COLORS.uiButton, '#dfe9f5', () =>
+    // Control buttons: mode, speed, auto-start, rush-the-next-wave (top-right).
+    this.modeBtn = this.makeButton(430, 8, 150, 32, '', COLORS.uiButton, '#dfe9f5', () =>
+      this.toggleMode()
+    );
+    this.speedBtn = this.makeButton(588, 8, 72, 32, '', COLORS.uiButton, '#dfe9f5', () =>
       this.cycleSpeed()
     );
-    this.autoBtn = this.makeButton(694, 8, 110, 32, '', COLORS.uiButton, '#dfe9f5', () =>
+    this.autoBtn = this.makeButton(668, 8, 104, 32, '', COLORS.uiButton, '#dfe9f5', () =>
       this.toggleAutoStart()
     );
-    this.nextWaveBtn = this.makeButton(812, 8, 138, 32, '', COLORS.ghostOk, '#08240f', () =>
+    this.nextWaveBtn = this.makeButton(780, 8, 168, 32, '', COLORS.ghostOk, '#08240f', () =>
       this.launchWave()
     );
 
@@ -425,6 +433,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.updateSpeedBtn();
     this.updateAutoBtn();
+    this.updateModeBtn();
     this.updateHud();
   }
 
@@ -517,10 +526,25 @@ export default class GameScene extends Phaser.Scene {
     this.autoBtn.bg.setFillStyle(this.autoStart ? COLORS.uiButtonOn : COLORS.uiButton);
   }
 
+  // Campaign = the 20 hand-built waves with a Victory at the end.
+  // Endless = waves never stop and there's no win, only how far you get.
+  toggleMode() {
+    this.endless = !this.endless;
+    this.updateModeBtn();
+    this.refreshWaveUi();
+  }
+
+  updateModeBtn() {
+    this.modeBtn.label.setText(`Mode: ${this.endless ? 'Endless' : 'Campaign'}`);
+    this.modeBtn.bg.setFillStyle(this.endless ? COLORS.uiButtonOn : COLORS.uiButton);
+  }
+
   updateHud() {
+    const waveLabel = this.endless
+      ? `Wave ${this.currentWave} (Endless)`
+      : `Wave ${this.currentWave}/${WAVES.length}`;
     this.hudText.setText(
-      `Wave ${this.currentWave}/${WAVES.length}     Credits ${this.credits}     ` +
-        `Shield ${this.baseHp}`
+      `${waveLabel}     Credits ${this.credits}     Shield ${this.baseHp}`
     );
     if (this.toolButtons) {
       for (const btn of this.toolButtons) {
@@ -536,7 +560,9 @@ export default class GameScene extends Phaser.Scene {
   refreshWaveUi() {
     this.updateHud();
 
-    const canLaunch = !this.allWavesCleared && this.currentWave < WAVES.length;
+    // In Endless mode there's always a next wave to launch.
+    const canLaunch =
+      !this.allWavesCleared && (this.endless || this.currentWave < WAVES.length);
     this.nextWaveBtn.bg.setVisible(canLaunch);
     this.nextWaveBtn.label.setVisible(canLaunch);
     if (canLaunch) {
