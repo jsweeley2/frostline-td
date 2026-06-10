@@ -43,6 +43,11 @@ export default class GameScene extends Phaser.Scene {
     super({ key: 'GameScene', active: false });
   }
 
+  // Receives { endless } when started from the title or "Play Again".
+  init(data) {
+    this.startEndless = !!(data && data.endless);
+  }
+
   create() {
     this.level = level1;
     this.baseHp = level1.baseHp;
@@ -65,7 +70,7 @@ export default class GameScene extends Phaser.Scene {
     this.autoStartPending = false; // a queued auto-start timer is in flight
 
     this.gameEnded = false; // win or lose reached
-    this.endless = false; // Campaign (20 waves) vs Endless (infinite)
+    this.endless = this.startEndless || false; // Campaign vs Endless (from init)
 
     // Two grids:
     //   blocked  — pathfinding walls (only structure towers set this true).
