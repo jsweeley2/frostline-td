@@ -605,21 +605,31 @@ export default class GameScene extends Phaser.Scene {
 
   createUi() {
     // Top bar (HUD + controls) and bottom bar (tower palette).
-    this.add.rectangle(0, 0, GAME_WIDTH, TOP_BAR_H, COLORS.uiPanel, 0.92).setOrigin(0).setDepth(8);
+    this.add.rectangle(0, 0, GAME_WIDTH, TOP_BAR_H, COLORS.uiPanel, 0.95).setOrigin(0).setDepth(8);
     const bottomY = GRID_Y + GRID_H;
     this.add
-      .rectangle(0, bottomY, GAME_WIDTH, BOTTOM_BAR_H, COLORS.uiPanel, 0.92)
+      .rectangle(0, bottomY, GAME_WIDTH, BOTTOM_BAR_H, COLORS.uiPanel, 0.95)
       .setOrigin(0)
       .setDepth(8);
+
+    // Glowing cyan accent lines along the inner edges of the HUD bars.
+    const accent = this.add.graphics().setDepth(9);
+    accent.fillStyle(0x6fd0ff, 0.85);
+    accent.fillRect(0, TOP_BAR_H - 2, GAME_WIDTH, 2);
+    accent.fillRect(0, bottomY, GAME_WIDTH, 2);
+    accent.fillStyle(0x6fd0ff, 0.25);
+    accent.fillRect(0, TOP_BAR_H, GAME_WIDTH, 4);
+    accent.fillRect(0, bottomY - 4, GAME_WIDTH, 4);
 
     this.hudText = this.add
       .text(14, 16, '', {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '15px',
-        color: '#dfe9f5',
+        color: '#dff4ff',
         fontStyle: 'bold',
       })
       .setDepth(10);
+    this.hudText.setShadow(0, 0, '#3fd0ff', 8, false, true);
 
     // Control buttons: mode, speed, auto-start, rush-the-next-wave (top-right).
     this.modeBtn = this.makeButton(430, 8, 150, 32, '', COLORS.uiButton, '#dfe9f5', () =>
@@ -815,78 +825,64 @@ export default class GameScene extends Phaser.Scene {
     const g = this.pathGraphics;
     g.clear();
     if (!this.path || this.path.length < 2) return;
-    g.lineStyle(3, COLORS.path, 0.5);
-    const first = cellCenter(this.path[0].col, this.path[0].row);
-    g.beginPath();
-    g.moveTo(first.x, first.y);
-    for (let i = 1; i < this.path.length; i++) {
-      const p = cellCenter(this.path[i].col, this.path[i].row);
-      g.lineTo(p.x, p.y);
-    }
-    g.strokePath();
+    // A glowing energy lane: wide soft halo, brighter mid, bright core.
+    const pts = this.path.map((p) => cellCenter(p.col, p.row));
+    g.lineStyle(9, 0x2bd4d9, 0.12); g.strokePoints(pts);
+    g.lineStyle(4, 0x49e6ea, 0.32); g.strokePoints(pts);
+    g.lineStyle(1.5, 0xbafcff, 0.6); g.strokePoints(pts);
   }
 
   drawSnowfield() {
     const g = this.add.graphics().setDepth(0);
 
-    // Cool checkerboard base.
+    // Dark holographic battle-map ground with a vertical gradient.
+    g.fillGradientStyle(0x0a1828, 0x0a1828, 0x123049, 0x163a52, 1);
+    g.fillRect(GRID_X, GRID_Y, GRID_W, GRID_H);
+
+    // Soft command-console glow in the center.
+    g.fillStyle(0x2f88b8, 0.1);
+    g.fillEllipse(GRID_X + GRID_W / 2, GRID_Y + GRID_H / 2, GRID_W * 0.72, GRID_H * 0.85);
+
+    // Faint checker tint for subtle surface texture.
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
-        const shade = (col + row) % 2 === 0 ? 0xcfe0f2 : 0xc4d7ec;
-        g.fillStyle(shade, 1);
-        g.fillRect(GRID_X + col * TILE, GRID_Y + row * TILE, TILE, TILE);
+        if ((col + row) % 2 === 0) {
+          g.fillStyle(0x9fd6ff, 0.035);
+          g.fillRect(GRID_X + col * TILE, GRID_Y + row * TILE, TILE, TILE);
+        }
       }
     }
 
-    // Scattered terrain detail so the snowfield reads as a real place: frozen
-    // ponds, rocks, ice crystals, snow tufts and cracks. Purely cosmetic; drawn
-    // once, underneath everything else.
+    // Cool terrain detail: frozen sheets (cyan-rimmed), ice glints, sparkles,
+    // glowing cracks. Purely cosmetic; drawn once, under everything else.
     const rand = (a, b) => Phaser.Math.Between(a, b);
-    for (let i = 0; i < 14; i++) {
-      // frozen ponds
+    for (let i = 0; i < 12; i++) {
       const x = rand(GRID_X + 60, GRID_X + GRID_W - 60);
       const y = rand(GRID_Y + 60, GRID_Y + GRID_H - 60);
-      const rw = rand(34, 70);
-      g.fillStyle(0xa9caea, 0.55);
-      g.fillEllipse(x, y, rw, rw * 0.7);
-      g.fillStyle(0xe8f3ff, 0.5);
-      g.fillEllipse(x - rw * 0.15, y - rw * 0.15, rw * 0.4, rw * 0.22);
-    }
-    for (let i = 0; i < 30; i++) {
-      // rocks
-      const x = rand(GRID_X + 20, GRID_X + GRID_W - 20);
-      const y = rand(GRID_Y + 20, GRID_Y + GRID_H - 20);
-      const r = rand(3, 7);
-      g.fillStyle(0x7b8696, 0.9);
-      g.fillCircle(x, y, r);
-      g.fillStyle(0x99a3b1, 0.9);
-      g.fillCircle(x - 1, y - 1, r * 0.5);
+      const rw = rand(34, 72);
+      g.fillStyle(0x14384f, 0.5); g.fillEllipse(x, y, rw, rw * 0.7);
+      g.lineStyle(1, 0x4fb6d6, 0.22); g.strokeEllipse(x, y, rw, rw * 0.7);
+      g.fillStyle(0x8fdcff, 0.16); g.fillEllipse(x - rw * 0.15, y - rw * 0.18, rw * 0.34, rw * 0.18);
     }
     for (let i = 0; i < 26; i++) {
-      // ice crystals (little cyan diamonds)
       const x = rand(GRID_X + 20, GRID_X + GRID_W - 20);
       const y = rand(GRID_Y + 20, GRID_Y + GRID_H - 20);
-      const s = rand(3, 6);
-      g.fillStyle(0x8fdcff, 0.8);
-      g.fillPoints([
-        { x, y: y - s }, { x: x + s * 0.7, y }, { x, y: y + s }, { x: x - s * 0.7, y },
-      ], true);
+      const s = rand(2, 5);
+      g.fillStyle(0x8fdcff, 0.55);
+      g.fillPoints([{ x, y: y - s }, { x: x + s * 0.6, y }, { x, y: y + s }, { x: x - s * 0.6, y }], true);
     }
-    for (let i = 0; i < 40; i++) {
-      // snow tufts (tiny white dots)
+    for (let i = 0; i < 55; i++) {
       const x = rand(GRID_X + 10, GRID_X + GRID_W - 10);
       const y = rand(GRID_Y + 10, GRID_Y + GRID_H - 10);
-      g.fillStyle(0xffffff, 0.5);
-      g.fillCircle(x, y, rand(1, 2));
+      g.fillStyle(0xcfeeff, Phaser.Math.FloatBetween(0.12, 0.5));
+      g.fillCircle(x, y, Phaser.Math.FloatBetween(0.6, 1.6));
     }
     for (let i = 0; i < 16; i++) {
-      // hairline cracks
       const x = rand(GRID_X + 30, GRID_X + GRID_W - 30);
       const y = rand(GRID_Y + 30, GRID_Y + GRID_H - 30);
-      g.lineStyle(1, 0xaebfd4, 0.6);
-      g.lineBetween(x, y, x + rand(-22, 22), y + rand(-14, 14));
+      g.lineStyle(1, 0x5fbfe0, 0.22);
+      g.lineBetween(x, y, x + rand(-24, 24), y + rand(-16, 16));
     }
-
   }
 
   // A chunky containment frame around the battlefield: a dark metal border with
@@ -962,6 +958,25 @@ export default class GameScene extends Phaser.Scene {
         quantity: 2,
       })
       .setDepth(7);
+
+    // Drifting aurora wisps echoing the title screen.
+    const auroras = [
+      { c: 0x1f6f8f, x: GRID_X + GRID_W * 0.28, y: GRID_Y + GRID_H * 0.25 },
+      { c: 0x2f9e7f, x: GRID_X + GRID_W * 0.74, y: GRID_Y + GRID_H * 0.78 },
+    ];
+    auroras.forEach((a, i) => {
+      const e = this.add.ellipse(a.x, a.y, 420, 180, a.c, 0.08).setDepth(0);
+      this.tweens.add({
+        targets: e, x: a.x + (i % 2 ? 40 : -40),
+        alpha: { from: 0.05, to: 0.13 }, duration: 5000 + i * 1100, yoyo: true, repeat: -1,
+      });
+    });
+
+    // A cyan scan-line sweeping down the battlefield.
+    const sweep = this.add
+      .rectangle(GRID_X, GRID_Y, GRID_W, 2, 0x8fdcff, 0.18)
+      .setOrigin(0, 0).setDepth(7).setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({ targets: sweep, y: GRID_Y + GRID_H, duration: 5600, repeat: -1 });
   }
 
   // A little burst when an enemy dies.
@@ -982,13 +997,32 @@ export default class GameScene extends Phaser.Scene {
   }
 
   drawGridLines() {
-    const g = this.add.graphics();
-    g.lineStyle(1, COLORS.grid, 0.6);
+    const g = this.add.graphics().setDepth(0);
+
+    // Minor glowing grid.
+    g.lineStyle(1, 0x3f7ea0, 0.22);
     for (let col = 0; col <= COLS; col++) {
       g.lineBetween(GRID_X + col * TILE, GRID_Y, GRID_X + col * TILE, GRID_Y + GRID_H);
     }
     for (let row = 0; row <= ROWS; row++) {
       g.lineBetween(GRID_X, GRID_Y + row * TILE, GRID_X + GRID_W, GRID_Y + row * TILE);
+    }
+
+    // Brighter major grid every 4 cells.
+    g.lineStyle(1, 0x6fd0ff, 0.3);
+    for (let col = 0; col <= COLS; col += 4) {
+      g.lineBetween(GRID_X + col * TILE, GRID_Y, GRID_X + col * TILE, GRID_Y + GRID_H);
+    }
+    for (let row = 0; row <= ROWS; row += 4) {
+      g.lineBetween(GRID_X, GRID_Y + row * TILE, GRID_X + GRID_W, GRID_Y + row * TILE);
+    }
+
+    // Glowing nodes at major intersections.
+    g.fillStyle(0x8fdcff, 0.3);
+    for (let col = 0; col <= COLS; col += 4) {
+      for (let row = 0; row <= ROWS; row += 4) {
+        g.fillCircle(GRID_X + col * TILE, GRID_Y + row * TILE, 1.7);
+      }
     }
   }
 
