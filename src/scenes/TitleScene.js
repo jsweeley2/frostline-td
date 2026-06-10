@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config.js';
+import { buildGameTextures } from '../art.js';
 
 // ---------------------------------------------------------------------------
 // TitleScene — the sci-fi title screen shown before the game starts.
@@ -20,11 +21,16 @@ export default class TitleScene extends Phaser.Scene {
     this.started = false;
     this.cameras.main.setBackgroundColor('#05070d');
 
+    buildGameTextures(this); // so we can show real game art on the menu
+
     this.buildBackdrop(W, H);
+    this.buildGrid(W, H);
+    this.buildFleet(W, H);
     this.buildTitle(W, H);
     this.buildQuote(W, H);
     this.buildStart(W, H);
     this.buildFrame(W, H);
+    this.buildTelemetry(W, H);
 
     // Begin on click, Enter or Space.
     const begin = () => this.begin();
@@ -105,6 +111,12 @@ export default class TitleScene extends Phaser.Scene {
       .setOrigin(0.5).setDepth(20);
     sub.setShadow(0, 0, '#2f9ed0', 10, false, true);
 
+    // Glowing energy underline that sweeps to full width.
+    const underline = this.add.rectangle(W / 2, ty + 88, 10, 3, 0x6fd0ff, 0.95).setDepth(20);
+    underline.setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({ targets: underline, width: 420, duration: 900, delay: 400, ease: 'Cubic.Out' });
+    this.tweens.add({ targets: underline, alpha: { from: 0.5, to: 1 }, duration: 1400, yoyo: true, repeat: -1, delay: 1300 });
+
     // Intro animation.
     title.setScale(0.85).setAlpha(0);
     this.tweens.add({ targets: title, scale: 1, alpha: 1, duration: 800, ease: 'Back.Out' });
@@ -173,6 +185,52 @@ export default class TitleScene extends Phaser.Scene {
     corner(W - m, m, -1, 1);
     corner(m, H - m, 1, -1);
     corner(W - m, H - m, -1, -1);
+  }
+
+  // A perspective energy grid across the ice-planet surface for depth.
+  buildGrid(W, H) {
+    const g = this.add.graphics().setDepth(4);
+    g.lineStyle(1, 0x4fb6d6, 0.16);
+    const vpX = W / 2, vpY = H * 0.6, baseY = H + 30;
+    for (let i = -7; i <= 7; i++) {
+      g.lineBetween(vpX, vpY, W / 2 + i * (W / 8), baseY);
+    }
+    for (let j = 1; j <= 7; j++) {
+      const t = j / 8;
+      const y = vpY + (baseY - vpY) * Math.pow(t, 1.7);
+      g.lineBetween(0, y, W, y);
+    }
+  }
+
+  // Drifting previews of real in-game sprites, so the menu shows off the art.
+  buildFleet(W, H) {
+    const float = (key, x, y, scale, alpha, spin) => {
+      const img = this.add.image(x, y, key).setDepth(6).setScale(scale).setAlpha(alpha);
+      this.tweens.add({ targets: img, y: y + 12, duration: 2600 + Math.random() * 1200, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+      if (spin) this.tweens.add({ targets: img, angle: 360, duration: 9000, repeat: -1 });
+      return img;
+    };
+    float('tower_sniper', W * 0.13, H * 0.34, 1.5, 0.5);
+    float('tower_tesla', W * 0.87, H * 0.36, 1.4, 0.5);
+    float('enemy_juggernaut', W * 0.12, H * 0.66, 1.3, 0.55);
+    float('enemy_disruptor', W * 0.88, H * 0.64, 1.4, 0.6, true);
+  }
+
+  // Faux command-console telemetry in the corners for sci-fi flavor.
+  buildTelemetry(W, H) {
+    const style = { fontFamily: '"Courier New", monospace', fontSize: '13px', color: '#5fbfe0' };
+    const lines = [
+      { t: 'SECTOR 07 // GLACIUS', x: 44, y: 40, ox: 0, oy: 0 },
+      { t: 'SHIELD GENERATOR: ONLINE', x: W - 44, y: 40, ox: 1, oy: 0 },
+      { t: 'THREAT LEVEL: ELEVATED', x: 44, y: H - 44, ox: 0, oy: 1 },
+      { t: 'FROSTLINE OS  v1.0', x: W - 44, y: H - 44, ox: 1, oy: 1 },
+    ];
+    lines.forEach((l) => {
+      const txt = this.add.text(l.x, l.y, l.t, style).setOrigin(l.ox, l.oy).setDepth(20).setAlpha(0.7);
+      if (l.t.includes('THREAT')) {
+        this.tweens.add({ targets: txt, alpha: { from: 0.35, to: 0.85 }, duration: 700, yoyo: true, repeat: -1 });
+      }
+    });
   }
 
   begin() {
