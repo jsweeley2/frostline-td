@@ -40,6 +40,7 @@ Following the staged build order from the spec:
 - [x] **Step 9** — Win / lose conditions (Game Over + Victory screens, Play Again)
 - [x] **Expansion** — 3 new enemies + 3 new towers + UI layout refactor (see below)
 - [x] **Endless mode** — Campaign/Endless toggle; infinite procedurally-scaled waves
+- [x] **Art pass** — original sprite art (baked in code in `src/art.js`), combat effects, animations
 - [ ] Step 10 — Polish pass (balance tuning)
 
 ## Modes

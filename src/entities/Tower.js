@@ -37,114 +37,49 @@ export default class Tower {
     else this.drawSniper();
   }
 
-  // ---- visuals -----------------------------------------------------------
-
-  basePlatform() {
-    const pad = this.scene.add
-      .rectangle(this.x, this.y, TILE - 6, TILE - 6, 0x24323f)
-      .setStrokeStyle(2, 0x0c1d33)
-      .setDepth(3);
-    this.parts.push(pad);
-  }
+  // ---- visuals (baked sprite textures from art.js) -----------------------
 
   drawSniper() {
-    this.basePlatform();
     const { x, y } = this;
-    // Rotating barrel (pivots at the tower center, extends outward).
-    this.barrel = this.scene.add
-      .rectangle(x, y, TILE * 0.5, 6, 0xcfe0ff)
-      .setOrigin(0, 0.5)
-      .setStrokeStyle(1, 0x0c1d33)
-      .setDepth(4);
-    const hub = this.scene.add
-      .circle(x, y, TILE * 0.2, this.stats.bodyColor)
-      .setStrokeStyle(2, 0x0c1d33)
-      .setDepth(5);
-    const scope = this.scene.add.circle(x, y, TILE * 0.07, this.stats.accentColor).setDepth(6);
-    this.parts.push(this.barrel, hub, scope);
+    this.parts.push(this.scene.add.image(x, y, 'tower_sniper').setDepth(3));
+    // Barrel pivots near the hub (origin biased left) and tracks the target.
+    this.barrel = this.scene.add.image(x, y, 'tower_sniper_barrel').setOrigin(0.18, 0.5).setDepth(4);
+    this.parts.push(this.barrel);
   }
 
   drawPlasma() {
-    this.basePlatform();
     const { x, y } = this;
-    this.barrel = this.scene.add
-      .rectangle(x, y, TILE * 0.34, 13, 0x4a2a78)
-      .setOrigin(0, 0.5)
-      .setStrokeStyle(1, 0x0c1d33)
-      .setDepth(4);
-    const hub = this.scene.add
-      .circle(x, y, TILE * 0.22, this.stats.bodyColor)
-      .setStrokeStyle(2, 0x0c1d33)
-      .setDepth(5);
-    const orb = this.scene.add.circle(x, y, TILE * 0.1, this.stats.accentColor).setDepth(6);
-    this.scene.tweens.add({ targets: orb, alpha: { from: 0.6, to: 1 }, duration: 700, yoyo: true, repeat: -1 });
-    this.parts.push(this.barrel, hub, orb);
+    this.parts.push(this.scene.add.image(x, y, 'tower_plasma').setDepth(3));
+    this.barrel = this.scene.add.image(x, y, 'tower_plasma_barrel').setOrigin(0.2, 0.5).setDepth(4);
+    this.parts.push(this.barrel);
   }
 
   drawTesla() {
-    this.basePlatform();
     const { x, y } = this;
-    const post = this.scene.add
-      .rectangle(x, y + 5, 9, TILE * 0.42, this.stats.bodyColor)
-      .setStrokeStyle(2, 0x0c1d33)
-      .setDepth(4);
-    // Stacked coil rings.
-    for (let i = 0; i < 3; i++) {
-      this.parts.push(
-        this.scene.add.rectangle(x, y + 6 - i * 7, 18 - i * 3, 4, 0x9be8dd).setDepth(5)
-      );
-    }
-    const orb = this.scene.add.circle(x, y - TILE * 0.2, TILE * 0.15, this.stats.accentColor).setDepth(6);
+    this.parts.push(this.scene.add.image(x, y, 'tower_tesla').setDepth(3));
+    const orb = this.scene.add.circle(x, y - 8, 7, this.stats.accentColor, 0.6).setDepth(4);
     this.scene.tweens.add({
-      targets: orb,
-      alpha: { from: 0.55, to: 1 },
-      scale: { from: 0.8, to: 1.15 },
+      targets: orb, alpha: { from: 0.25, to: 0.8 }, scale: { from: 0.8, to: 1.25 },
       duration: 550, yoyo: true, repeat: -1,
     });
-    this.parts.push(post, orb);
+    this.parts.push(orb);
   }
 
   drawFrost() {
     const { x, y } = this;
-    // Faint slowing aura covering the tower's range.
     const aura = this.scene.add
       .circle(x, y, this.stats.range, COLORS.frostAura, 0.06)
       .setStrokeStyle(1, COLORS.frostAura, 0.3)
       .setDepth(1);
     this.scene.tweens.add({ targets: aura, alpha: { from: 0.04, to: 0.13 }, duration: 1700, yoyo: true, repeat: -1 });
-
-    this.basePlatform();
-    const hub = this.scene.add
-      .circle(x, y, TILE * 0.2, this.stats.bodyColor)
-      .setStrokeStyle(2, 0x0c1d33)
-      .setDepth(4);
-    // Slowly spinning snowflake.
-    const flake = this.scene.add.graphics({ x, y }).setDepth(5);
-    flake.lineStyle(3, 0xffffff, 0.95);
-    for (let i = 0; i < 6; i++) {
-      const a = (i / 6) * Math.PI * 2;
-      flake.lineBetween(0, 0, Math.cos(a) * TILE * 0.16, Math.sin(a) * TILE * 0.16);
-    }
-    this.scene.tweens.add({ targets: flake, rotation: Math.PI * 2, duration: 5200, repeat: -1 });
-    this.parts.push(aura, hub, flake);
+    this.parts.push(aura);
+    this.parts.push(this.scene.add.image(x, y, 'tower_frost').setDepth(3));
   }
 
   // A flat hazard marker at ground level (depth 1, under enemies at depth 2).
   drawTrap() {
-    const { x, y } = this;
-    this.trapMarker = this.scene.add
-      .rectangle(x, y, TILE - 12, TILE - 12, this.stats.color, 0.85)
-      .setStrokeStyle(2, this.stats.armColor)
-      .setAngle(45)
-      .setDepth(1);
-    // Hook prongs in the corners.
-    const prongs = this.scene.add.graphics({ x, y }).setDepth(1);
-    prongs.lineStyle(2, 0x5c4410, 0.9);
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-      prongs.lineBetween(Math.cos(a) * 6, Math.sin(a) * 6, Math.cos(a) * 13, Math.sin(a) * 13);
-    }
-    this.parts.push(this.trapMarker, prongs);
+    this.trapMarker = this.scene.add.image(this.x, this.y, 'tower_tripwire').setDepth(1);
+    this.parts.push(this.trapMarker);
   }
 
   // Knocked offline by a Disruptor EMP.
@@ -282,10 +217,9 @@ export default class Tower {
 
   setArmed(armed) {
     if (!this.trapMarker) return;
-    this.trapMarker.setFillStyle(
-      armed ? this.stats.color : this.stats.armColor,
-      armed ? 0.85 : 0.5
-    );
+    // Tint + dim the sprite while the trap re-arms.
+    this.trapMarker.setTint(armed ? 0xffffff : 0x8a8a8a);
+    this.trapMarker.setAlpha(armed ? 1 : 0.6);
   }
 
   // ---- slow aura (Frost Tower) -------------------------------------------

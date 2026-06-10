@@ -23,6 +23,7 @@ import { cellCenter, pixelToCell, inBounds } from '../grid.js';
 import { level1 } from '../maps/level1.js';
 import { WAVES, getWave } from '../maps/waves.js';
 import { findPath } from '../pathfinding/astar.js';
+import { buildGameTextures } from '../art.js';
 import Enemy from '../entities/Enemy.js';
 import Tower from '../entities/Tower.js';
 
@@ -68,6 +69,8 @@ export default class GameScene extends Phaser.Scene {
     //   occupied — any tower (wall OR trap), so we never stack two on a cell.
     this.blocked = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
     this.occupied = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+
+    buildGameTextures(this); // bake all sprite textures once
 
     this.drawSnowfield();
     this.drawGridLines();
