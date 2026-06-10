@@ -41,7 +41,15 @@ Following the staged build order from the spec:
 - [x] **Expansion** — 3 new enemies + 3 new towers + UI layout refactor (see below)
 - [x] **Endless mode** — Campaign/Endless toggle; infinite procedurally-scaled waves
 - [x] **Art pass** — original sprite art (baked in code in `src/art.js`), combat effects, animations
+- [x] **Upgrades + border** — click a tower to upgrade it (3 levels); decorative field frame
 - [ ] Step 10 — Polish pass (balance tuning)
+
+## Upgrading towers
+
+Click a placed tower (when no tower button is selected) to open its panel, then
+press **U** or click **Upgrade** to spend credits leveling it up (max Lv 3).
+Each level boosts the tower's key stats (damage/range/fire rate, splash, chains,
+slow strength, etc.). Gold pips above a tower show its level.
 
 ## Modes
 

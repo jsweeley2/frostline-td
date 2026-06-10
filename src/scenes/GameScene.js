@@ -82,6 +82,7 @@ export default class GameScene extends Phaser.Scene {
     this.drawBase();
     this.createAmbience();
     this.createVignette();
+    this.drawBorder();
 
     this.createInput();
     this.createUi();
@@ -402,12 +403,100 @@ export default class GameScene extends Phaser.Scene {
     });
     this.gridZone.on('pointerdown', (pointer) => this.onGridClick(pointer));
 
-    // Right-click or Escape cancels the current tower selection.
+    // Right-click or Escape cancels tool placement and clears any selection.
     this.input.mouse?.disableContextMenu();
     this.input.on('pointerdown', (pointer) => {
-      if (pointer.rightButtonDown()) this.selectTool(null);
+      if (pointer.rightButtonDown()) { this.selectTool(null); this.deselectTower(); }
     });
-    this.input.keyboard?.on('keydown-ESC', () => this.selectTool(null));
+    this.input.keyboard?.on('keydown-ESC', () => { this.selectTool(null); this.deselectTower(); });
+    // U upgrades the currently selected tower.
+    this.input.keyboard?.on('keydown-U', () => this.upgradeSelected());
+
+    this.createUpgradeUi();
+  }
+
+  // ---- tower selection + upgrades ----------------------------------------
+
+  createUpgradeUi() {
+    this.selectedTower = null;
+
+    // Highlight ring + range circle drawn on the selected tower.
+    this.selectRing = this.add.circle(0, 0, TILE * 0.6).setStrokeStyle(3, 0xffd23f, 0.9).setDepth(6).setVisible(false);
+    this.selectRange = this.add
+      .circle(0, 0, 10, 0xffd23f, 0.05)
+      .setStrokeStyle(1, 0xffd23f, 0.4)
+      .setDepth(5)
+      .setVisible(false);
+
+    // Floating info/upgrade panel (top-left of the field).
+    const px = GRID_X + 12, py = GRID_Y + 12, pw = 250, ph = 104;
+    this.upPanel = this.add.container(px, py).setDepth(13).setVisible(false);
+    const bg = this.add.rectangle(0, 0, pw, ph, 0x0d1a2b, 0.95).setOrigin(0).setStrokeStyle(2, 0x8fdcff, 0.6);
+    this.upTitle = this.add.text(12, 8, '', { fontFamily: 'system-ui, sans-serif', fontSize: '15px', color: '#dfe9f5', fontStyle: 'bold' });
+    this.upStats = this.add.text(12, 32, '', { fontFamily: 'system-ui, sans-serif', fontSize: '12px', color: '#9fc0ff', lineSpacing: 3 });
+    this.upBtnBg = this.add.rectangle(12, ph - 32, pw - 24, 26, COLORS.ghostOk).setOrigin(0).setInteractive({ useHandCursor: true });
+    this.upBtnText = this.add.text(pw / 2, ph - 19, '', { fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#08240f', fontStyle: 'bold' }).setOrigin(0.5);
+    this.upBtnBg.on('pointerdown', () => this.upgradeSelected());
+    this.upPanel.add([bg, this.upTitle, this.upStats, this.upBtnBg, this.upBtnText]);
+  }
+
+  selectTower(tower) {
+    this.selectedTower = tower;
+    this.selectRing.setPosition(tower.x, tower.y).setVisible(true);
+    if (tower.range) {
+      this.selectRange.setPosition(tower.x, tower.y).setRadius(tower.range).setVisible(true);
+    } else {
+      this.selectRange.setVisible(false);
+    }
+    this.refreshUpgradePanel();
+    this.upPanel.setVisible(true);
+  }
+
+  deselectTower() {
+    this.selectedTower = null;
+    if (this.selectRing) this.selectRing.setVisible(false);
+    if (this.selectRange) this.selectRange.setVisible(false);
+    if (this.upPanel) this.upPanel.setVisible(false);
+  }
+
+  refreshUpgradePanel() {
+    const t = this.selectedTower;
+    if (!t) return;
+    this.upTitle.setText(`${t.stats.name}   Lv ${t.level}/${t.maxLevel}`);
+
+    let stats;
+    if (t.stats.kind === 'slow') {
+      stats = `Slow ${Math.round((1 - t.slowFactor) * 100)}%\nDamage/sec ${t.damagePerSec}\nRange ${t.range}`;
+    } else if (t.stats.kind === 'trap') {
+      stats = `Damage ${t.damage}\nFreeze ${(t.immobilizeMs / 1000).toFixed(1)}s`;
+    } else {
+      stats = `Damage ${t.damage}\nRange ${t.range}   Rate ${(t.fireRateMs / 1000).toFixed(1)}s`;
+      if (t.chainCount) stats += `\nChains ${t.chainCount}`;
+    }
+    this.upStats.setText(stats);
+
+    if (!t.canUpgrade()) {
+      this.upBtnText.setText('MAX LEVEL');
+      this.upBtnBg.setFillStyle(0x3a4d63);
+    } else {
+      const cost = t.upgradeCost();
+      const afford = this.credits >= cost;
+      this.upBtnText.setText(`Upgrade: ${cost}  [U]`);
+      this.upBtnBg.setFillStyle(afford ? COLORS.ghostOk : 0x7a4a4a);
+    }
+  }
+
+  upgradeSelected() {
+    const t = this.selectedTower;
+    if (!t || !t.canUpgrade()) return;
+    const cost = t.upgradeCost();
+    if (this.credits < cost) return;
+    this.credits -= cost;
+    t.upgrade();
+    this.placeFx(t.x, t.y);
+    if (t.range) this.selectRange.setRadius(t.range);
+    this.updateHud();
+    this.refreshUpgradePanel();
   }
 
   onGridHover(pointer) {
@@ -440,12 +529,25 @@ export default class GameScene extends Phaser.Scene {
   }
 
   onGridClick(pointer) {
-    if (!this.selectedTool) return;
     const { col, row } = pixelToCell(pointer.worldX, pointer.worldY);
-    if (this.canPlace(col, row, this.selectedTool)) {
-      this.placeTower(col, row, this.selectedTool);
-      this.onGridHover(pointer); // refresh ghost (cell is now occupied)
+
+    // Placement mode: drop the selected tower.
+    if (this.selectedTool) {
+      if (this.canPlace(col, row, this.selectedTool)) {
+        this.placeTower(col, row, this.selectedTool);
+        this.onGridHover(pointer); // refresh ghost (cell is now occupied)
+      }
+      return;
     }
+
+    // Otherwise: click a placed tower to select it for upgrading.
+    const tower = this.towerAt(col, row);
+    if (tower) this.selectTower(tower);
+    else this.deselectTower();
+  }
+
+  towerAt(col, row) {
+    return this.towers.find((t) => t.col === col && t.row === row) || null;
   }
 
   // ---- UI ----------------------------------------------------------------
@@ -559,6 +661,7 @@ export default class GameScene extends Phaser.Scene {
 
   selectTool(stats) {
     this.selectedTool = stats;
+    if (stats) this.deselectTower(); // can't place and inspect at once
     for (const btn of this.toolButtons) {
       btn.bg.setFillStyle(btn.stats === stats ? COLORS.uiButtonOn : COLORS.uiButton);
     }
@@ -626,6 +729,8 @@ export default class GameScene extends Phaser.Scene {
         btn.label.setAlpha(afford ? 1 : 0.5);
       }
     }
+    // Keep the upgrade panel's affordability current as credits change.
+    if (this.selectedTower) this.refreshUpgradePanel();
   }
 
   // The Next-Wave button stays available while any waves remain to launch (even
@@ -721,10 +826,48 @@ export default class GameScene extends Phaser.Scene {
       g.lineBetween(x, y, x + rand(-22, 22), y + rand(-14, 14));
     }
 
-    // A soft glowing frame around the play area.
-    const frame = this.add.graphics().setDepth(6);
-    frame.lineStyle(2, 0x8fdcff, 0.5);
-    frame.strokeRect(GRID_X + 1, GRID_Y + 1, GRID_W - 2, GRID_H - 2);
+  }
+
+  // A chunky containment frame around the battlefield: a dark metal border with
+  // a top bevel, a glowing inner energy edge, corner brackets and rivets.
+  drawBorder() {
+    const x = GRID_X, y = GRID_Y, w = GRID_W, h = GRID_H, t = 8;
+    const g = this.add.graphics().setDepth(6);
+
+    // Dark metal frame (four bands).
+    g.fillStyle(0x16202e, 1);
+    g.fillRect(x, y, w, t);
+    g.fillRect(x, y + h - t, w, t);
+    g.fillRect(x, y, t, h);
+    g.fillRect(x + w - t, y, t, h);
+
+    // Top/left bevel highlight.
+    g.fillStyle(0x32465e, 1);
+    g.fillRect(x, y, w, 3);
+    g.fillRect(x, y, 3, h);
+
+    // Glowing inner energy edge.
+    g.lineStyle(2, 0x8fdcff, 0.7);
+    g.strokeRect(x + t, y + t, w - 2 * t, h - 2 * t);
+
+    // Corner brackets.
+    g.lineStyle(3, 0x8fdcff, 0.95);
+    const b = 24, i = t + 4;
+    const corner = (cx, cy, sx, sy) => {
+      g.lineBetween(cx, cy, cx + b * sx, cy);
+      g.lineBetween(cx, cy, cx, cy + b * sy);
+    };
+    corner(x + i, y + i, 1, 1);
+    corner(x + w - i, y + i, -1, 1);
+    corner(x + i, y + h - i, 1, -1);
+    corner(x + w - i, y + h - i, -1, -1);
+
+    // Rivets along the top and bottom bands.
+    g.fillStyle(0x46607d, 1);
+    for (let rx = x + 24; rx < x + w - 10; rx += 60) {
+      g.fillCircle(rx, y + t / 2, 2);
+      g.fillCircle(rx, y + h - t / 2, 2);
+    }
   }
 
   // Soft inner shadow around the field edges for depth.

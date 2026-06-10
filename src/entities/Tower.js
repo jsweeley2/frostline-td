@@ -30,11 +30,80 @@ export default class Tower {
     this.parts = []; // game objects to clean up on destroy
     this.barrel = null; // rotating barrel for shooter towers
 
+    // Per-tower (upgradeable) stats, copied from the config so upgrades don't
+    // mutate the shared template. Methods read these, not this.stats.<x>.
+    this.level = 1;
+    this.maxLevel = 3;
+    this.range = stats.range;
+    this.damage = stats.damage;
+    this.fireRateMs = stats.fireRateMs;
+    this.splashRadius = stats.splashRadius;
+    this.chainCount = stats.chainCount;
+    this.chainRange = stats.chainRange;
+    this.chainFalloff = stats.chainFalloff;
+    this.immobilizeMs = stats.immobilizeMs;
+    this.cooldownMs = stats.cooldownMs;
+    this.triggerRadius = stats.triggerRadius;
+    this.slowFactor = stats.slowFactor;
+    this.damagePerSec = stats.damagePerSec;
+    this.tracerColor = stats.tracerColor;
+
     if (stats.kind === 'trap') this.drawTrap();
     else if (stats.kind === 'slow') this.drawFrost();
     else if (stats.key === 'plasma') this.drawPlasma();
     else if (stats.key === 'tesla') this.drawTesla();
     else this.drawSniper();
+
+    this.addRankPips();
+  }
+
+  // ---- upgrades ----------------------------------------------------------
+
+  canUpgrade() {
+    return this.level < this.maxLevel;
+  }
+
+  // Cost to go from the current level to the next.
+  upgradeCost() {
+    return Math.round(this.stats.cost * 0.8 * this.level);
+  }
+
+  // Improve the tower's stats by one level. Returns false if already maxed.
+  upgrade() {
+    if (!this.canUpgrade()) return false;
+    this.level += 1;
+    if (this.stats.kind === 'shooter') {
+      this.damage = Math.round(this.damage * 1.45);
+      this.range = Math.round(this.range * 1.12);
+      this.fireRateMs = Math.round(this.fireRateMs * 0.84);
+      if (this.splashRadius) this.splashRadius = Math.round(this.splashRadius * 1.15);
+      if (this.chainCount) this.chainCount += 1;
+    } else if (this.stats.kind === 'trap') {
+      this.damage = Math.round(this.damage * 1.5);
+      this.immobilizeMs = Math.round(this.immobilizeMs * 1.2);
+      this.cooldownMs = Math.round(this.cooldownMs * 0.85);
+    } else if (this.stats.kind === 'slow') {
+      this.slowFactor = Math.max(0.2, Math.round((this.slowFactor - 0.12) * 100) / 100);
+      this.damagePerSec = Math.round(this.damagePerSec * 1.5);
+      this.range = Math.round(this.range * 1.1);
+      if (this.frostAura) this.frostAura.setRadius(this.range);
+    }
+    this.addRankPips();
+    return true;
+  }
+
+  // Small gold pips above the tower showing its level.
+  addRankPips() {
+    if (this.rankGfx) this.rankGfx.destroy();
+    this.rankGfx = this.scene.add.graphics().setDepth(7);
+    this.rankGfx.fillStyle(0xffd23f, 1);
+    this.rankGfx.lineStyle(1, 0x7a5a10, 1);
+    const total = this.level;
+    const startX = this.x - (total - 1) * 4;
+    for (let i = 0; i < total; i++) {
+      this.rankGfx.fillCircle(startX + i * 8, this.y - TILE * 0.5, 2.5);
+      this.rankGfx.strokeCircle(startX + i * 8, this.y - TILE * 0.5, 2.5);
+    }
   }
 
   // ---- visuals (baked sprite textures from art.js) -----------------------
@@ -67,12 +136,12 @@ export default class Tower {
 
   drawFrost() {
     const { x, y } = this;
-    const aura = this.scene.add
-      .circle(x, y, this.stats.range, COLORS.frostAura, 0.06)
+    this.frostAura = this.scene.add
+      .circle(x, y, this.range, COLORS.frostAura, 0.06)
       .setStrokeStyle(1, COLORS.frostAura, 0.3)
       .setDepth(1);
-    this.scene.tweens.add({ targets: aura, alpha: { from: 0.04, to: 0.13 }, duration: 1700, yoyo: true, repeat: -1 });
-    this.parts.push(aura);
+    this.scene.tweens.add({ targets: this.frostAura, alpha: { from: 0.04, to: 0.13 }, duration: 1700, yoyo: true, repeat: -1 });
+    this.parts.push(this.frostAura);
     this.parts.push(this.scene.add.image(x, y, 'tower_frost').setDepth(3));
   }
 
@@ -119,19 +188,19 @@ export default class Tower {
     const target = this.findTarget(enemies);
     if (!target) return;
 
-    const color = this.stats.tracerColor;
+    const color = this.tracerColor;
     if (this.barrel) this.muzzleFlash();
-    if (this.stats.chainCount) {
+    if (this.chainCount) {
       this.scene.lightning(this.x, this.y, target.x, target.y, color);
     } else {
       this.scene.bolt(this.x, this.y, target.x, target.y, color);
     }
-    target.takeDamage(this.stats.damage);
+    target.takeDamage(this.damage);
 
-    if (this.stats.splashRadius) this.fireSplash(target, enemies);
-    if (this.stats.chainCount) this.fireChain(target, enemies);
+    if (this.splashRadius) this.fireSplash(target, enemies);
+    if (this.chainCount) this.fireChain(target, enemies);
 
-    this.cooldown = this.stats.fireRateMs;
+    this.cooldown = this.fireRateMs;
   }
 
   // Flash at the tip of the rotating barrel.
@@ -140,16 +209,16 @@ export default class Tower {
     this.scene.muzzleFlash(
       this.x + Math.cos(this.barrel.rotation) * len,
       this.y + Math.sin(this.barrel.rotation) * len,
-      this.stats.tracerColor
+      this.tracerColor
     );
   }
 
   fireSplash(target, enemies) {
-    this.scene.explosion(target.x, target.y, this.stats.splashRadius, this.stats.tracerColor);
+    this.scene.explosion(target.x, target.y, this.splashRadius, this.tracerColor);
     for (const e of enemies) {
       if (!e.alive || e === target) continue;
-      if (Math.hypot(e.x - target.x, e.y - target.y) <= this.stats.splashRadius) {
-        e.takeDamage(this.stats.damage);
+      if (Math.hypot(e.x - target.x, e.y - target.y) <= this.splashRadius) {
+        e.takeDamage(this.damage);
       }
     }
   }
@@ -157,25 +226,25 @@ export default class Tower {
   fireChain(target, enemies) {
     const hit = new Set([target]);
     let from = target;
-    let dmg = this.stats.damage * this.stats.chainFalloff;
-    for (let i = 0; i < this.stats.chainCount; i++) {
+    let dmg = this.damage * this.chainFalloff;
+    for (let i = 0; i < this.chainCount; i++) {
       let next = null;
       let bestDist = Infinity;
       for (const e of enemies) {
         if (!e.alive || hit.has(e)) continue;
         const d = Math.hypot(e.x - from.x, e.y - from.y);
-        if (d <= this.stats.chainRange && d < bestDist) {
+        if (d <= this.chainRange && d < bestDist) {
           bestDist = d;
           next = e;
         }
       }
       if (!next) break;
-      this.scene.lightning(from.x, from.y, next.x, next.y, this.stats.tracerColor);
-      this.scene.impactSpark(next.x, next.y, this.stats.tracerColor);
+      this.scene.lightning(from.x, from.y, next.x, next.y, this.tracerColor);
+      this.scene.impactSpark(next.x, next.y, this.tracerColor);
       next.takeDamage(dmg);
       hit.add(next);
       from = next;
-      dmg *= this.stats.chainFalloff;
+      dmg *= this.chainFalloff;
     }
   }
 
@@ -185,7 +254,7 @@ export default class Tower {
     for (const e of enemies) {
       if (!e.alive) continue;
       const d = Math.hypot(e.x - this.x, e.y - this.y);
-      if (d <= this.stats.range && d < bestDist) {
+      if (d <= this.range && d < bestDist) {
         bestDist = d;
         best = e;
       }
@@ -205,10 +274,10 @@ export default class Tower {
     for (const e of enemies) {
       if (!e.alive || !e.stats.triggersTripwire) continue;
       const d = Math.hypot(e.x - this.x, e.y - this.y);
-      if (d <= this.stats.triggerRadius) {
-        e.takeDamage(this.stats.damage);
-        e.immobilize(this.stats.immobilizeMs);
-        this.cooldown = this.stats.cooldownMs;
+      if (d <= this.triggerRadius) {
+        e.takeDamage(this.damage);
+        e.immobilize(this.immobilizeMs);
+        this.cooldown = this.cooldownMs;
         this.setArmed(false);
         break;
       }
@@ -225,11 +294,11 @@ export default class Tower {
   // ---- slow aura (Frost Tower) -------------------------------------------
 
   updateSlow(deltaMs, enemies) {
-    const dot = (this.stats.damagePerSec || 0) * (deltaMs / 1000);
+    const dot = (this.damagePerSec || 0) * (deltaMs / 1000);
     for (const e of enemies) {
       if (!e.alive) continue;
-      if (Math.hypot(e.x - this.x, e.y - this.y) <= this.stats.range) {
-        e.applySlow(this.stats.slowFactor, 250);
+      if (Math.hypot(e.x - this.x, e.y - this.y) <= this.range) {
+        e.applySlow(this.slowFactor, 250);
         if (dot > 0) e.takeDamage(dot);
       }
     }
@@ -237,6 +306,7 @@ export default class Tower {
 
   destroy() {
     for (const p of this.parts) p.destroy();
+    if (this.rankGfx) this.rankGfx.destroy();
     this.parts = [];
   }
 }
