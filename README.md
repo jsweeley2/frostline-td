@@ -42,6 +42,7 @@ Following the staged build order from the spec:
 - [x] **Endless mode** — Campaign/Endless toggle; infinite procedurally-scaled waves
 - [x] **Art pass** — original sprite art (baked in code in `src/art.js`), combat effects, animations
 - [x] **Upgrades + border** — click a tower to upgrade it (3 levels); decorative field frame
+- [x] **Title screen** — animated sci-fi title (aurora, starfield, ice planet) with a quote
 - [ ] Step 10 — Polish pass (balance tuning)
 
 ## Upgrading towers

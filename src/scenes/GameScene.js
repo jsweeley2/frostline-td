@@ -39,7 +39,8 @@ import Tower from '../entities/Tower.js';
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
-    super('GameScene');
+    // active:false — the TitleScene starts this scene when the player begins.
+    super({ key: 'GameScene', active: false });
   }
 
   create() {
