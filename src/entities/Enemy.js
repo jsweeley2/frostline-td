@@ -1,3 +1,4 @@
+import Phaser from 'phaser';
 import { cellCenter } from '../grid.js';
 
 // ---------------------------------------------------------------------------
@@ -6,8 +7,9 @@ import { cellCenter } from '../grid.js';
 // centers at its own speed. When it runs out of path it has reached the base
 // and damages it.
 //
-// The path can be replaced mid-walk (setPath) — that's how step 4 reroutes
-// enemies when a tower is placed.
+// Each enemy type gets its own little drawn silhouette (a Container of shapes),
+// plus a health bar that appears once it's been hurt and a frost tint while
+// slowed. Gameplay still keys off this.x / this.y / stats only.
 // ---------------------------------------------------------------------------
 
 export default class Enemy {
@@ -15,6 +17,7 @@ export default class Enemy {
     this.scene = scene;
     this.stats = stats;
     this.hp = Math.round(stats.hp * hpScale); // scaled up in endless mode
+    this.maxHp = this.hp;
     this.speed = stats.speed;
     this.damage = stats.damage;
     this.alive = true;
@@ -26,31 +29,96 @@ export default class Enemy {
     const start = cellCenter(path[0].col, path[0].row);
     this.x = start.x;
     this.y = start.y;
-    this.sprite = this.makeSprite(scene, stats);
+    this.buildArt(scene, stats);
 
     this.setPath(path);
   }
 
-  // Distinct placeholder silhouettes per shape. Depth 2 keeps enemies above
-  // ground traps (depth 1) but below structure towers (depth 3).
-  makeSprite(scene, stats) {
+  // Build the enemy's drawn silhouette as a Container of shapes, plus a frost
+  // tint and a health bar (hidden until damaged).
+  buildArt(scene, stats) {
+    const c = scene.add.container(this.x, this.y).setDepth(2);
     const r = stats.radius;
-    let sprite;
-    if (stats.shape === 'square') {
-      sprite = scene.add.rectangle(this.x, this.y, r * 2, r * 2, stats.color);
-    } else if (stats.shape === 'diamond') {
-      sprite = scene.add.rectangle(this.x, this.y, r * 1.7, r * 1.7, stats.color).setAngle(45);
-    } else {
-      sprite = scene.add.circle(this.x, this.y, r, stats.color);
+
+    // Frost tint (shown only while slowed), behind the body.
+    this.frostOverlay = scene.add
+      .circle(0, 0, r + 3, 0x8fdcff, 0.5)
+      .setVisible(false);
+    c.add(this.frostOverlay);
+
+    for (const part of this.bodyParts(scene, stats, r)) c.add(part);
+
+    // Health bar (origin-left fill so it shrinks rightward).
+    this.hpBarW = r * 2 + 4;
+    const barY = -(r + 9);
+    this.hpBarBg = scene.add
+      .rectangle(-this.hpBarW / 2, barY, this.hpBarW, 5, 0x10131c)
+      .setOrigin(0, 0.5).setVisible(false);
+    this.hpBarFill = scene.add
+      .rectangle(-this.hpBarW / 2, barY, this.hpBarW, 5, 0x46d36a)
+      .setOrigin(0, 0.5).setVisible(false);
+    c.add(this.hpBarBg);
+    c.add(this.hpBarFill);
+
+    this.sprite = c;
+  }
+
+  // Per-type placeholder art. Returns an array of shapes centered on (0,0).
+  bodyParts(scene, stats, r) {
+    const dark = 0x2b2b3a;
+    const tri = (x1, y1, x2, y2, x3, y3, color) =>
+      scene.add.triangle(0, 0, x1, y1, x2, y2, x3, y3, color).setStrokeStyle(2, dark);
+
+    switch (stats.key) {
+      case 'runner':
+        return [
+          scene.add.rectangle(-r, -2, r * 0.8, 2, 0xffd1e0),
+          scene.add.rectangle(-r, 2, r * 0.8, 2, 0xffd1e0),
+          tri(-r, -r * 0.7, -r, r * 0.7, r * 1.3, 0, stats.color),
+        ];
+      case 'heavyWalker': {
+        const leg = (lx, ly) => scene.add.rectangle(lx, ly, 5, 9, 0x3a3550);
+        return [
+          leg(-r * 0.7, r * 0.7), leg(r * 0.7, r * 0.7),
+          leg(-r * 0.7, -r * 0.7), leg(r * 0.7, -r * 0.7),
+          scene.add.rectangle(0, 0, r * 1.7, r * 1.5, stats.color).setStrokeStyle(2, dark),
+          scene.add.rectangle(r * 0.5, 0, r * 0.5, r * 0.6, 0x4a4466),
+          scene.add.circle(r * 0.7, 0, 2.5, 0xff5a5a),
+        ];
+      }
+      case 'disruptor': {
+        const core = scene.add.circle(0, 0, r * 0.4, 0xfff0ff);
+        scene.tweens.add({ targets: core, alpha: { from: 0.5, to: 1 }, duration: 500, yoyo: true, repeat: -1 });
+        const ring = scene.add.graphics();
+        ring.lineStyle(2, 0xd9c2ff, 0.9);
+        ring.strokeCircle(0, 0, r * 0.85);
+        scene.tweens.add({ targets: ring, rotation: Math.PI * 2, duration: 1400, repeat: -1 });
+        return [
+          scene.add.rectangle(0, 0, r * 1.4, r * 1.4, stats.color).setStrokeStyle(2, dark).setAngle(45),
+          ring, core,
+        ];
+      }
+      case 'juggernaut':
+        return [
+          scene.add.rectangle(-r * 0.85, 0, 6, r * 1.7, 0x20242e), // treads
+          scene.add.rectangle(r * 0.85, 0, 6, r * 1.7, 0x20242e),
+          scene.add.rectangle(0, 0, r * 1.6, r * 1.6, stats.color).setStrokeStyle(3, 0x14161d),
+          scene.add.rectangle(0, -r * 0.3, r * 1.2, r * 0.5, 0x565d72), // armor plate
+          scene.add.circle(-r * 0.4, r * 0.4, 3, 0xff5a5a), // eyes
+          scene.add.circle(r * 0.4, r * 0.4, 3, 0xff5a5a),
+        ];
+      default: // lightScout
+        return [
+          tri(-r, -r * 0.8, -r, r * 0.8, r * 1.2, 0, stats.color),
+          scene.add.circle(r * 0.2, 0, r * 0.35, 0xbfeaff),
+        ];
     }
-    return sprite.setStrokeStyle(2, 0x2b2b3a).setDepth(2);
   }
 
   // Point the enemy at a fresh path. We keep walking toward the next cell that
   // is still ahead of us so a reroute doesn't make the enemy backtrack.
   setPath(path) {
     this.path = path;
-    // Advance the index past any cell we've effectively already passed.
     this.pathIndex = path.length > 1 ? 1 : 0;
   }
 
@@ -62,6 +130,7 @@ export default class Enemy {
       this.slowTimer -= deltaMs;
       if (this.slowTimer <= 0) this.slowFactor = 1;
     }
+    this.frostOverlay.setVisible(this.slowFactor < 1);
 
     // Stun attack (Disruptor): periodically disable the nearest tower in range.
     if (this.stats.stunsTowers) this.updateStunAttack(deltaMs);
@@ -77,17 +146,13 @@ export default class Enemy {
       return;
     }
 
-    const target = cellCenter(
-      this.path[this.pathIndex].col,
-      this.path[this.pathIndex].row
-    );
+    const target = cellCenter(this.path[this.pathIndex].col, this.path[this.pathIndex].row);
     const dx = target.x - this.x;
     const dy = target.y - this.y;
     const dist = Math.hypot(dx, dy);
     const step = (this.speed * this.slowFactor * deltaMs) / 1000;
 
     if (step >= dist) {
-      // Reached this cell; line up on the next one.
       this.x = target.x;
       this.y = target.y;
       this.pathIndex += 1;
@@ -102,7 +167,18 @@ export default class Enemy {
   takeDamage(amount) {
     if (!this.alive) return;
     this.hp -= amount;
+    this.updateHpBar();
     if (this.hp <= 0) this.die();
+  }
+
+  updateHpBar() {
+    const ratio = Phaser.Math.Clamp(this.hp / this.maxHp, 0, 1);
+    const show = ratio < 1;
+    this.hpBarBg.setVisible(show);
+    this.hpBarFill.setVisible(show);
+    this.hpBarFill.setSize(Math.max(0.001, this.hpBarW * ratio), 5);
+    const color = ratio > 0.5 ? 0x46d36a : ratio > 0.25 ? 0xf2c14e : 0xe05a47;
+    this.hpBarFill.setFillStyle(color);
   }
 
   immobilize(ms) {
@@ -110,15 +186,12 @@ export default class Enemy {
     this.stunTimer = Math.max(this.stunTimer, ms);
   }
 
-  // Apply a movement slow. The strongest active slow wins; the timer is
-  // refreshed so it persists while the enemy stays inside a Frost aura.
   applySlow(factor, ms) {
     if (!this.alive) return;
     this.slowFactor = Math.min(this.slowFactor, factor);
     this.slowTimer = Math.max(this.slowTimer, ms);
   }
 
-  // Disruptor's EMP: on a timer, disable the closest tower within range.
   updateStunAttack(deltaMs) {
     this.empTimer -= deltaMs;
     if (this.empTimer > 0) return;
@@ -127,7 +200,7 @@ export default class Enemy {
     let best = null;
     let bestDist = Infinity;
     for (const t of this.scene.towers) {
-      if (t.disabledTimer > 0) continue; // already down
+      if (t.disabledTimer > 0) continue;
       const d = Math.hypot(t.x - this.x, t.y - this.y);
       if (d <= range && d < bestDist) {
         bestDist = d;

@@ -77,6 +77,7 @@ export default class GameScene extends Phaser.Scene {
 
     this.drawSpawn();
     this.drawBase();
+    this.createAmbience();
 
     this.createInput();
     this.createUi();
@@ -295,6 +296,7 @@ export default class GameScene extends Phaser.Scene {
   onEnemyKilled(enemy) {
     this.kills += 1;
     this.credits += enemy.stats.reward || 0;
+    this.enemyDeathFx(enemy.x, enemy.y, enemy.stats.color);
     this.updateHud();
   }
 
@@ -588,13 +590,110 @@ export default class GameScene extends Phaser.Scene {
   }
 
   drawSnowfield() {
-    const g = this.add.graphics();
+    const g = this.add.graphics().setDepth(0);
+
+    // Cool checkerboard base.
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
-        const shade = (col + row) % 2 === 0 ? COLORS.snow : COLORS.snowAlt;
+        const shade = (col + row) % 2 === 0 ? 0xcfe0f2 : 0xc4d7ec;
         g.fillStyle(shade, 1);
         g.fillRect(GRID_X + col * TILE, GRID_Y + row * TILE, TILE, TILE);
       }
+    }
+
+    // Scattered terrain detail so the snowfield reads as a real place: frozen
+    // ponds, rocks, ice crystals, snow tufts and cracks. Purely cosmetic; drawn
+    // once, underneath everything else.
+    const rand = (a, b) => Phaser.Math.Between(a, b);
+    for (let i = 0; i < 14; i++) {
+      // frozen ponds
+      const x = rand(GRID_X + 60, GRID_X + GRID_W - 60);
+      const y = rand(GRID_Y + 60, GRID_Y + GRID_H - 60);
+      const rw = rand(34, 70);
+      g.fillStyle(0xa9caea, 0.55);
+      g.fillEllipse(x, y, rw, rw * 0.7);
+      g.fillStyle(0xe8f3ff, 0.5);
+      g.fillEllipse(x - rw * 0.15, y - rw * 0.15, rw * 0.4, rw * 0.22);
+    }
+    for (let i = 0; i < 30; i++) {
+      // rocks
+      const x = rand(GRID_X + 20, GRID_X + GRID_W - 20);
+      const y = rand(GRID_Y + 20, GRID_Y + GRID_H - 20);
+      const r = rand(3, 7);
+      g.fillStyle(0x7b8696, 0.9);
+      g.fillCircle(x, y, r);
+      g.fillStyle(0x99a3b1, 0.9);
+      g.fillCircle(x - 1, y - 1, r * 0.5);
+    }
+    for (let i = 0; i < 26; i++) {
+      // ice crystals (little cyan diamonds)
+      const x = rand(GRID_X + 20, GRID_X + GRID_W - 20);
+      const y = rand(GRID_Y + 20, GRID_Y + GRID_H - 20);
+      const s = rand(3, 6);
+      g.fillStyle(0x8fdcff, 0.8);
+      g.fillPoints([
+        { x, y: y - s }, { x: x + s * 0.7, y }, { x, y: y + s }, { x: x - s * 0.7, y },
+      ], true);
+    }
+    for (let i = 0; i < 40; i++) {
+      // snow tufts (tiny white dots)
+      const x = rand(GRID_X + 10, GRID_X + GRID_W - 10);
+      const y = rand(GRID_Y + 10, GRID_Y + GRID_H - 10);
+      g.fillStyle(0xffffff, 0.5);
+      g.fillCircle(x, y, rand(1, 2));
+    }
+    for (let i = 0; i < 16; i++) {
+      // hairline cracks
+      const x = rand(GRID_X + 30, GRID_X + GRID_W - 30);
+      const y = rand(GRID_Y + 30, GRID_Y + GRID_H - 30);
+      g.lineStyle(1, 0xaebfd4, 0.6);
+      g.lineBetween(x, y, x + rand(-22, 22), y + rand(-14, 14));
+    }
+
+    // A soft glowing frame around the play area.
+    const frame = this.add.graphics().setDepth(6);
+    frame.lineStyle(2, 0x8fdcff, 0.5);
+    frame.strokeRect(GRID_X + 1, GRID_Y + 1, GRID_W - 2, GRID_H - 2);
+  }
+
+  // Gentle ambient snowfall drifting across the field.
+  createAmbience() {
+    if (!this.textures.exists('snowflake')) {
+      const gg = this.make.graphics({ x: 0, y: 0, add: false });
+      gg.fillStyle(0xffffff, 1);
+      gg.fillCircle(4, 4, 3);
+      gg.generateTexture('snowflake', 8, 8);
+      gg.destroy();
+    }
+    this.add
+      .particles(0, 0, 'snowflake', {
+        x: { min: GRID_X, max: GRID_X + GRID_W },
+        y: { min: GRID_Y, max: GRID_Y + GRID_H },
+        lifespan: 5200,
+        speedY: { min: 14, max: 42 },
+        speedX: { min: -14, max: 14 },
+        scale: { min: 0.25, max: 0.85 },
+        alpha: { start: 0.7, end: 0 },
+        frequency: 110,
+        quantity: 2,
+      })
+      .setDepth(7);
+  }
+
+  // A little burst when an enemy dies.
+  enemyDeathFx(x, y, color) {
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const shard = this.add.circle(x, y, 3, color).setDepth(5);
+      this.tweens.add({
+        targets: shard,
+        x: x + Math.cos(a) * 18,
+        y: y + Math.sin(a) * 18,
+        alpha: 0,
+        scale: 0.2,
+        duration: 280,
+        onComplete: () => shard.destroy(),
+      });
     }
   }
 
@@ -612,33 +711,71 @@ export default class GameScene extends Phaser.Scene {
   drawSpawn() {
     const { col, row } = this.level.spawn;
     const { x, y } = cellCenter(col, row);
-    this.add.rectangle(x, y, TILE, TILE, COLORS.spawn, 0.35);
+
+    // Dark rift the enemies pour out of.
+    this.add.circle(x, y, TILE * 0.5, 0x2a0d0a, 0.55).setDepth(1);
+
+    // Swirling arcs that rotate.
+    const swirl = this.add.graphics({ x, y }).setDepth(2);
+    swirl.lineStyle(3, COLORS.spawn, 0.9);
+    for (let i = 0; i < 3; i++) {
+      const a0 = (i / 3) * Math.PI * 2;
+      swirl.beginPath();
+      swirl.arc(0, 0, TILE * 0.34, a0, a0 + Math.PI * 0.7);
+      swirl.strokePath();
+    }
+    this.tweens.add({ targets: swirl, rotation: Math.PI * 2, duration: 2600, repeat: -1 });
+
+    // Pulsing hot core.
+    const glow = this.add.circle(x, y, TILE * 0.2, COLORS.spawn, 0.8).setDepth(2);
+    this.tweens.add({
+      targets: glow,
+      scale: { from: 0.7, to: 1.35 },
+      alpha: { from: 0.8, to: 0.25 },
+      duration: 1100, yoyo: true, repeat: -1,
+    });
+
     this.add
-      .triangle(x, y, -10, -12, -10, 12, 12, 0, COLORS.spawn)
-      .setStrokeStyle(2, 0x7a1f15);
-    this.add
-      .text(x, y - TILE * 0.7, 'ENTRY', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '12px',
-        color: '#7a1f15',
-        fontStyle: 'bold',
+      .text(x, y - TILE * 0.78, 'ENTRY', {
+        fontFamily: 'system-ui, sans-serif', fontSize: '12px',
+        color: '#7a1f15', fontStyle: 'bold',
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5).setDepth(5);
   }
 
   drawBase() {
     const { col, row } = this.level.base;
     const { x, y } = cellCenter(col, row);
-    this.add.circle(x, y, TILE * 0.55, COLORS.baseRing, 0.25);
-    this.add.circle(x, y, TILE * 0.42).setStrokeStyle(3, COLORS.baseRing);
-    this.add.circle(x, y, TILE * 0.28, COLORS.base);
+
+    // Breathing shield dome.
+    const dome = this.add.circle(x, y, TILE * 0.6, COLORS.base, 0.16).setDepth(2);
+    this.tweens.add({
+      targets: dome,
+      scale: { from: 0.9, to: 1.14 },
+      alpha: { from: 0.12, to: 0.3 },
+      duration: 1500, yoyo: true, repeat: -1,
+    });
+
+    // Rotating generator ring with spokes.
+    const ring = this.add.graphics({ x, y }).setDepth(3);
+    ring.lineStyle(3, COLORS.baseRing, 0.95);
+    ring.strokeCircle(0, 0, TILE * 0.42);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      ring.lineBetween(Math.cos(a) * TILE * 0.3, Math.sin(a) * TILE * 0.3, Math.cos(a) * TILE * 0.42, Math.sin(a) * TILE * 0.42);
+    }
+    this.tweens.add({ targets: ring, rotation: Math.PI * 2, duration: 7000, repeat: -1 });
+
+    // Pulsing core with a bright center.
+    const core = this.add.circle(x, y, TILE * 0.24, COLORS.base).setDepth(4);
+    this.tweens.add({ targets: core, scale: { from: 0.85, to: 1.12 }, duration: 950, yoyo: true, repeat: -1 });
+    this.add.circle(x, y, TILE * 0.1, 0xffffff, 0.9).setDepth(5);
+
     this.add
-      .text(x, y - TILE * 0.8, 'SHIELD', {
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: '12px',
-        color: '#0c5a60',
-        fontStyle: 'bold',
+      .text(x, y - TILE * 0.85, 'SHIELD', {
+        fontFamily: 'system-ui, sans-serif', fontSize: '12px',
+        color: '#0c5a60', fontStyle: 'bold',
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5).setDepth(5);
   }
 }
