@@ -184,13 +184,29 @@ export default class Tower {
     const target = this.findTarget(enemies);
     if (!target) return;
 
-    this.scene.fireTracer(this.x, this.y, target.x, target.y, this.stats.tracerColor);
+    const color = this.stats.tracerColor;
+    if (this.barrel) this.muzzleFlash();
+    if (this.stats.chainCount) {
+      this.scene.lightning(this.x, this.y, target.x, target.y, color);
+    } else {
+      this.scene.bolt(this.x, this.y, target.x, target.y, color);
+    }
     target.takeDamage(this.stats.damage);
 
     if (this.stats.splashRadius) this.fireSplash(target, enemies);
     if (this.stats.chainCount) this.fireChain(target, enemies);
 
     this.cooldown = this.stats.fireRateMs;
+  }
+
+  // Flash at the tip of the rotating barrel.
+  muzzleFlash() {
+    const len = TILE * 0.5;
+    this.scene.muzzleFlash(
+      this.x + Math.cos(this.barrel.rotation) * len,
+      this.y + Math.sin(this.barrel.rotation) * len,
+      this.stats.tracerColor
+    );
   }
 
   fireSplash(target, enemies) {
@@ -219,7 +235,8 @@ export default class Tower {
         }
       }
       if (!next) break;
-      this.scene.fireTracer(from.x, from.y, next.x, next.y, this.stats.tracerColor);
+      this.scene.lightning(from.x, from.y, next.x, next.y, this.stats.tracerColor);
+      this.scene.impactSpark(next.x, next.y, this.stats.tracerColor);
       next.takeDamage(dmg);
       hit.add(next);
       from = next;

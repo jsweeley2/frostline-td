@@ -78,6 +78,7 @@ export default class GameScene extends Phaser.Scene {
     this.drawSpawn();
     this.drawBase();
     this.createAmbience();
+    this.createVignette();
 
     this.createInput();
     this.createUi();
@@ -145,6 +146,7 @@ export default class GameScene extends Phaser.Scene {
     this.occupied[row][col] = true;
     const tower = new Tower(this, col, row, stats);
     this.towers.push(tower);
+    this.placeFx(tower.x, tower.y);
     if (stats.blocks) {
       this.blocked[row][col] = true;
       this.recomputePath();
@@ -248,29 +250,94 @@ export default class GameScene extends Phaser.Scene {
     this.updateWaves();
   }
 
-  // Brief shot tracer from tower to target, fading out.
+  // Brief shot tracer from tower to target, fading out. (Kept as a simple
+  // fallback; most shots now use bolt()/lightning() below.)
   fireTracer(x1, y1, x2, y2, color) {
     const g = this.add.graphics().setDepth(5);
     g.lineStyle(2, color, 0.95);
     g.lineBetween(x1, y1, x2, y2);
+    this.tweens.add({ targets: g, alpha: 0, duration: 120, onComplete: () => g.destroy() });
+  }
+
+  // A glowing bolt (Sniper/Plasma): a soft halo line + a bright core, plus a
+  // little tracer dot that streaks to the impact and sparks.
+  bolt(x1, y1, x2, y2, color) {
+    const g = this.add.graphics().setDepth(5);
+    g.lineStyle(5, color, 0.3);
+    g.lineBetween(x1, y1, x2, y2);
+    g.lineStyle(1.5, 0xffffff, 0.95);
+    g.lineBetween(x1, y1, x2, y2);
+    this.tweens.add({ targets: g, alpha: 0, duration: 130, onComplete: () => g.destroy() });
+
+    const dot = this.add.circle(x1, y1, 4, color).setDepth(6);
     this.tweens.add({
-      targets: g,
-      alpha: 0,
-      duration: 120,
-      onComplete: () => g.destroy(),
+      targets: dot, x: x2, y: y2, duration: 80,
+      onComplete: () => { dot.destroy(); this.impactSpark(x2, y2, color); },
     });
   }
 
-  // Plasma splash flash: a filled circle that expands and fades.
+  // Jagged lightning (Tesla): a zig-zag glow + bright core that flickers out.
+  lightning(x1, y1, x2, y2, color) {
+    const segs = 6;
+    const pts = [{ x: x1, y: y1 }];
+    for (let i = 1; i < segs; i++) {
+      const t = i / segs;
+      pts.push({
+        x: x1 + (x2 - x1) * t + Phaser.Math.Between(-11, 11),
+        y: y1 + (y2 - y1) * t + Phaser.Math.Between(-11, 11),
+      });
+    }
+    pts.push({ x: x2, y: y2 });
+    const g = this.add.graphics().setDepth(5);
+    g.lineStyle(4, color, 0.35);
+    g.strokePoints(pts);
+    g.lineStyle(1.5, 0xffffff, 0.95);
+    g.strokePoints(pts);
+    this.tweens.add({ targets: g, alpha: 0, duration: 160, onComplete: () => g.destroy() });
+  }
+
+  // A bright pop at the muzzle when a barrel fires.
+  muzzleFlash(x, y, color) {
+    const f = this.add.circle(x, y, 7, 0xffffff, 0.95).setDepth(6);
+    f.setStrokeStyle(2, color, 0.9);
+    this.tweens.add({ targets: f, scale: { from: 1, to: 0.2 }, alpha: 0, duration: 110, onComplete: () => f.destroy() });
+  }
+
+  // Tiny shard burst where a shot lands.
+  impactSpark(x, y, color) {
+    for (let i = 0; i < 4; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const p = this.add.circle(x, y, 2, color).setDepth(5);
+      this.tweens.add({
+        targets: p, x: x + Math.cos(a) * 10, y: y + Math.sin(a) * 10,
+        alpha: 0, duration: 180, onComplete: () => p.destroy(),
+      });
+    }
+  }
+
+  // Ripple when a tower is placed.
+  placeFx(x, y) {
+    const ring = this.add.circle(x, y, 8).setStrokeStyle(3, 0x8fdcff, 0.9).setDepth(6);
+    this.tweens.add({ targets: ring, scale: { from: 0.4, to: 2.2 }, alpha: 0, duration: 300, onComplete: () => ring.destroy() });
+  }
+
+  // Red pulse over the field + a flare at the generator when the shield is hit.
+  baseHitFx() {
+    const flash = this.add
+      .rectangle(GRID_X, GRID_Y, GRID_W, GRID_H, 0xff3b3b, 0.16)
+      .setOrigin(0).setDepth(5);
+    this.tweens.add({ targets: flash, alpha: 0, duration: 280, onComplete: () => flash.destroy() });
+    const { x, y } = cellCenter(this.level.base.col, this.level.base.row);
+    const flare = this.add.circle(x, y, TILE * 0.5, 0xff7a7a, 0.55).setDepth(5);
+    this.tweens.add({ targets: flare, scale: { from: 0.8, to: 1.6 }, alpha: 0, duration: 320, onComplete: () => flare.destroy() });
+  }
+
+  // Plasma splash: an expanding filled blast plus a bright shock ring.
   explosion(x, y, radius, color) {
-    const c = this.add.circle(x, y, radius, color, 0.4).setDepth(5);
-    this.tweens.add({
-      targets: c,
-      scale: { from: 0.5, to: 1.1 },
-      alpha: 0,
-      duration: 220,
-      onComplete: () => c.destroy(),
-    });
+    const c = this.add.circle(x, y, radius, color, 0.45).setDepth(5);
+    this.tweens.add({ targets: c, scale: { from: 0.4, to: 1.15 }, alpha: 0, duration: 240, onComplete: () => c.destroy() });
+    const ring = this.add.circle(x, y, radius).setStrokeStyle(3, 0xffffff, 0.9).setDepth(6);
+    this.tweens.add({ targets: ring, scale: { from: 0.3, to: 1.3 }, alpha: 0, duration: 300, onComplete: () => ring.destroy() });
   }
 
   // Disruptor EMP: an expanding ring where a tower got knocked offline.
@@ -289,6 +356,7 @@ export default class GameScene extends Phaser.Scene {
 
   onEnemyReachBase(enemy) {
     this.baseHp = Math.max(0, this.baseHp - enemy.damage);
+    this.baseHitFx();
     this.updateHud();
     if (this.baseHp <= 0) this.endGame(false);
   }
@@ -654,6 +722,15 @@ export default class GameScene extends Phaser.Scene {
     const frame = this.add.graphics().setDepth(6);
     frame.lineStyle(2, 0x8fdcff, 0.5);
     frame.strokeRect(GRID_X + 1, GRID_Y + 1, GRID_W - 2, GRID_H - 2);
+  }
+
+  // Soft inner shadow around the field edges for depth.
+  createVignette() {
+    const fog = this.add.graphics().setDepth(1);
+    for (let i = 0; i < 10; i++) {
+      fog.lineStyle(2, 0x0b1320, 0.04);
+      fog.strokeRect(GRID_X + i * 2, GRID_Y + i * 2, GRID_W - i * 4, GRID_H - i * 4);
+    }
   }
 
   // Gentle ambient snowfall drifting across the field.

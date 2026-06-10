@@ -25,6 +25,7 @@ export default class Enemy {
     this.slowFactor = 1; // movement multiplier (1 = normal, <1 = slowed by Frost)
     this.slowTimer = 0; // ms the current slow lasts
     this.empTimer = stats.stunsTowers ? stats.stunsTowers.intervalMs : 0;
+    this.bobT = Math.random() * 1000; // phase offset so they don't bob in sync
 
     const start = cellCenter(path[0].col, path[0].row);
     this.x = start.x;
@@ -161,7 +162,11 @@ export default class Enemy {
       this.y += (dy / dist) * step;
     }
 
-    this.sprite.setPosition(this.x, this.y);
+    // A gentle bob while moving so units feel alive. Cosmetic only — gameplay
+    // uses this.x / this.y, which are unaffected.
+    this.bobT += deltaMs;
+    const bob = Math.sin(this.bobT * 0.012) * 1.5;
+    this.sprite.setPosition(this.x, this.y + bob);
   }
 
   takeDamage(amount) {
