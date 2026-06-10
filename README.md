@@ -49,7 +49,17 @@ Following the staged build order from the spec:
 Click a placed tower (when no tower button is selected) to open its panel, then
 press **U** or click **Upgrade** to spend credits leveling it up (max Lv 3).
 Each level boosts the tower's key stats (damage/range/fire rate, splash, chains,
-slow strength, etc.). Gold pips above a tower show its level.
+slow strength, etc.). Gold pips above a tower show its level. Press **S** or
+click **Sell** to remove a tower and refund part of what you spent on it.
+
+## Economy rules
+
+- Each tower type has a **build cap** (e.g. 14 Snipers, 8 Frost), shown on its
+  palette button as `count/max`.
+- Tower prices **rise** as you build more of a type (x1.15 per existing tower of
+  that type), so spamming one tower gets pricier; selling brings the price back
+  down.
+- **Selling** refunds 60% of everything spent on a tower (purchase + upgrades).
 
 ## Modes
 

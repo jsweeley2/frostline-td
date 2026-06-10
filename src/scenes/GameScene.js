@@ -18,6 +18,8 @@ import {
   STARTING_CREDITS,
   SPEED_STEPS,
   AUTO_START_DELAY_MS,
+  COST_GROWTH,
+  SELL_REFUND,
 } from '../config.js';
 import { cellCenter, pixelToCell, inBounds } from '../grid.js';
 import { level1 } from '../maps/level1.js';
@@ -124,16 +126,31 @@ export default class GameScene extends Phaser.Scene {
     return findPath(COLS, ROWS, (c, r) => this.isBlocked(c, r), start, this.level.base);
   }
 
-  // ---- tower placement ---------------------------------------------------
+  // ---- tower placement, pricing + caps -----------------------------------
 
-  // Can this tower go on this cell? Must be in bounds, not the spawn/base, and
-  // not already occupied. A wall-type tower additionally must not seal off the
-  // path to the base; a trap never blocks, so it skips that check.
+  // How many of this tower type are currently on the field.
+  countOf(key) {
+    return this.towers.reduce((n, t) => n + (t.stats.key === key ? 1 : 0), 0);
+  }
+
+  // Price rises with each tower of that type you already own.
+  costToBuild(stats) {
+    return Math.round(stats.cost * COST_GROWTH ** this.countOf(stats.key));
+  }
+
+  atMax(stats) {
+    return this.countOf(stats.key) >= stats.max;
+  }
+
+  // Can this tower go on this cell? Must be in bounds, not the spawn/base, not
+  // occupied, under the build cap, and affordable. A wall-type tower also must
+  // not seal off the path to the base; a trap never blocks, so it skips that.
   canPlace(col, row, stats) {
     if (!inBounds(col, row)) return false;
     if (this.isReserved(col, row)) return false;
     if (this.isOccupied(col, row)) return false;
-    if (stats && stats.cost > this.credits) return false; // can't afford it
+    if (stats && this.atMax(stats)) return false; // hit the build cap
+    if (stats && this.costToBuild(stats) > this.credits) return false; // can't afford
 
     if (stats && stats.blocks) {
       // Tentatively block it and confirm a path still exists.
@@ -146,15 +163,33 @@ export default class GameScene extends Phaser.Scene {
   }
 
   placeTower(col, row, stats) {
-    this.credits -= stats.cost;
+    const cost = this.costToBuild(stats);
+    this.credits -= cost;
     this.occupied[row][col] = true;
     const tower = new Tower(this, col, row, stats);
+    tower.spent = cost; // tracked for sell refunds (grows with upgrades)
     this.towers.push(tower);
     this.placeFx(tower.x, tower.y);
     if (stats.blocks) {
       this.blocked[row][col] = true;
       this.recomputePath();
     }
+    this.updateHud();
+  }
+
+  // Sell a placed tower for a refund of part of everything spent on it.
+  sellTower(tower) {
+    const refund = Math.round((tower.spent || tower.stats.cost) * SELL_REFUND);
+    this.credits += refund;
+    this.occupied[tower.row][tower.col] = false;
+    this.towers = this.towers.filter((t) => t !== tower);
+    if (tower.stats.blocks) {
+      this.blocked[tower.row][tower.col] = false;
+      this.recomputePath();
+    }
+    this.placeFx(tower.x, tower.y);
+    tower.destroy();
+    this.deselectTower();
     this.updateHud();
   }
 
@@ -409,8 +444,9 @@ export default class GameScene extends Phaser.Scene {
       if (pointer.rightButtonDown()) { this.selectTool(null); this.deselectTower(); }
     });
     this.input.keyboard?.on('keydown-ESC', () => { this.selectTool(null); this.deselectTower(); });
-    // U upgrades the currently selected tower.
+    // U upgrades the selected tower; S sells it.
     this.input.keyboard?.on('keydown-U', () => this.upgradeSelected());
+    this.input.keyboard?.on('keydown-S', () => this.sellSelected());
 
     this.createUpgradeUi();
   }
@@ -428,16 +464,22 @@ export default class GameScene extends Phaser.Scene {
       .setDepth(5)
       .setVisible(false);
 
-    // Floating info/upgrade panel (top-left of the field).
-    const px = GRID_X + 12, py = GRID_Y + 12, pw = 250, ph = 104;
+    // Floating info / upgrade / sell panel (top-left of the field).
+    const px = GRID_X + 12, py = GRID_Y + 12, pw = 252, ph = 140;
     this.upPanel = this.add.container(px, py).setDepth(13).setVisible(false);
     const bg = this.add.rectangle(0, 0, pw, ph, 0x0d1a2b, 0.95).setOrigin(0).setStrokeStyle(2, 0x8fdcff, 0.6);
     this.upTitle = this.add.text(12, 8, '', { fontFamily: 'system-ui, sans-serif', fontSize: '15px', color: '#dfe9f5', fontStyle: 'bold' });
     this.upStats = this.add.text(12, 32, '', { fontFamily: 'system-ui, sans-serif', fontSize: '12px', color: '#9fc0ff', lineSpacing: 3 });
-    this.upBtnBg = this.add.rectangle(12, ph - 32, pw - 24, 26, COLORS.ghostOk).setOrigin(0).setInteractive({ useHandCursor: true });
-    this.upBtnText = this.add.text(pw / 2, ph - 19, '', { fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#08240f', fontStyle: 'bold' }).setOrigin(0.5);
+
+    this.upBtnBg = this.add.rectangle(12, ph - 64, pw - 24, 26, COLORS.ghostOk).setOrigin(0).setInteractive({ useHandCursor: true });
+    this.upBtnText = this.add.text(pw / 2, ph - 51, '', { fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#08240f', fontStyle: 'bold' }).setOrigin(0.5);
     this.upBtnBg.on('pointerdown', () => this.upgradeSelected());
-    this.upPanel.add([bg, this.upTitle, this.upStats, this.upBtnBg, this.upBtnText]);
+
+    this.sellBtnBg = this.add.rectangle(12, ph - 32, pw - 24, 26, 0xc7873b).setOrigin(0).setInteractive({ useHandCursor: true });
+    this.sellBtnText = this.add.text(pw / 2, ph - 19, '', { fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#2a1705', fontStyle: 'bold' }).setOrigin(0.5);
+    this.sellBtnBg.on('pointerdown', () => this.sellSelected());
+
+    this.upPanel.add([bg, this.upTitle, this.upStats, this.upBtnBg, this.upBtnText, this.sellBtnBg, this.sellBtnText]);
   }
 
   selectTower(tower) {
@@ -484,6 +526,9 @@ export default class GameScene extends Phaser.Scene {
       this.upBtnText.setText(`Upgrade: ${cost}  [U]`);
       this.upBtnBg.setFillStyle(afford ? COLORS.ghostOk : 0x7a4a4a);
     }
+
+    const refund = Math.round((t.spent || t.stats.cost) * SELL_REFUND);
+    this.sellBtnText.setText(`Sell: +${refund}  [S]`);
   }
 
   upgradeSelected() {
@@ -492,11 +537,16 @@ export default class GameScene extends Phaser.Scene {
     const cost = t.upgradeCost();
     if (this.credits < cost) return;
     this.credits -= cost;
+    t.spent = (t.spent || t.stats.cost) + cost; // counts toward sell refund
     t.upgrade();
     this.placeFx(t.x, t.y);
     if (t.range) this.selectRange.setRadius(t.range);
     this.updateHud();
     this.refreshUpgradePanel();
+  }
+
+  sellSelected() {
+    if (this.selectedTower) this.sellTower(this.selectedTower);
   }
 
   onGridHover(pointer) {
@@ -722,15 +772,25 @@ export default class GameScene extends Phaser.Scene {
     this.hudText.setText(
       `${waveLabel}     Credits ${this.credits}     Shield ${this.baseHp}`
     );
-    if (this.toolButtons) {
-      for (const btn of this.toolButtons) {
-        const afford = btn.stats.cost <= this.credits;
-        btn.bg.setAlpha(afford ? 1 : 0.4);
-        btn.label.setAlpha(afford ? 1 : 0.5);
-      }
-    }
+    this.refreshToolButtons();
     // Keep the upgrade panel's affordability current as credits change.
     if (this.selectedTower) this.refreshUpgradePanel();
+  }
+
+  // Update each palette button with its live price + count/cap, and dim it when
+  // unaffordable or maxed out.
+  refreshToolButtons() {
+    if (!this.toolButtons) return;
+    for (const btn of this.toolButtons) {
+      const count = this.countOf(btn.stats.key);
+      const maxed = count >= btn.stats.max;
+      const cost = this.costToBuild(btn.stats);
+      const line2 = maxed ? `MAX  ${count}/${btn.stats.max}` : `${cost}c   ${count}/${btn.stats.max}`;
+      btn.label.setText(`${btn.stats.name}\n${line2}`);
+      const usable = !maxed && cost <= this.credits;
+      btn.bg.setAlpha(usable ? 1 : 0.4);
+      btn.label.setAlpha(usable ? 1 : 0.55);
+    }
   }
 
   // The Next-Wave button stays available while any waves remain to launch (even

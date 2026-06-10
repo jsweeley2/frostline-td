@@ -31,6 +31,12 @@ export const SPEED_STEPS = [1, 2, 3];
 // Game-time delay before an auto-started wave begins once the field is clear.
 export const AUTO_START_DELAY_MS = 2000;
 
+// Each tower of a given type costs a bit more than the last one you built
+// (multiplied by this per existing tower of that type), so spamming one tower
+// gets pricier. Selling refunds this fraction of everything spent on a tower.
+export const COST_GROWTH = 1.15;
+export const SELL_REFUND = 0.6;
+
 // Palette (ice-planet theme). Hex numbers for Phaser fills.
 export const COLORS = {
   snow: 0xdfe9f5, // base snowfield
@@ -75,6 +81,7 @@ export const TOWERS = {
     kind: 'shooter', // fires at enemies in range
     desc: 'Precise single-target damage, slow reload. Best against light units.',
     cost: 50,
+    max: 14,
     range: 170,
     damage: 22,
     fireRateMs: 2000,
@@ -89,6 +96,7 @@ export const TOWERS = {
     kind: 'trap', // a ground trap: enemies walk over it
     desc: 'Ground trap. Big hit + freeze on Walkers/Juggernauts. Ignores fast units.',
     cost: 20,
+    max: 20,
     blocks: false, // does NOT block the path
     damage: 80, // heavy hit to whatever trips it
     immobilizeMs: 1000, // briefly freezes the victim
@@ -103,6 +111,7 @@ export const TOWERS = {
     kind: 'slow', // continuous slowing aura
     desc: 'Slows every enemy in range and chips away at them. A force multiplier.',
     cost: 40,
+    max: 8,
     range: 120,
     slowFactor: 0.45, // enemies move at 45% speed inside the aura
     damagePerSec: 7, // light chip damage
@@ -116,6 +125,7 @@ export const TOWERS = {
     kind: 'shooter',
     desc: 'Lobs shells that explode for AREA damage. Shreds tight groups and swarms.',
     cost: 70,
+    max: 10,
     range: 190,
     damage: 24,
     fireRateMs: 1800,
@@ -131,6 +141,7 @@ export const TOWERS = {
     kind: 'shooter',
     desc: 'Fast arcs of lightning that CHAIN between several nearby enemies.',
     cost: 85,
+    max: 8,
     range: 165,
     damage: 16,
     fireRateMs: 850,
