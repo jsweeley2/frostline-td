@@ -47,7 +47,17 @@ Following the staged build order from the spec:
 - [x] **Kill Shop** — every 5 cleared waves (solo), spend kills on stacking global perks
 - [x] **Maps** — map picker; freeform maze + fixed-path lane maps (see below)
 - [x] **Feel pass** — synth sound effects (M mutes), floating credit/damage numbers, pause (P), how-to screen, tower tooltips
+- [x] **Meta** — tower targeting modes (First/Last/Closest/Strongest), boss waves every 10, saved Endless best-wave per map
 - [ ] Step 10 — Polish pass (balance tuning)
+
+## Meta features
+
+- **Targeting modes:** select a placed shooter tower and cycle its target
+  priority (First / Last / Closest / Strongest) in the panel.
+- **Boss waves:** every 10th wave sends a giant Juggernaut boss (lots of HP, big
+  credit reward) with a warning banner.
+- **High scores:** Endless saves your best wave reached per map (localStorage);
+  the end screen shows it and flags a new best.
 
 ## Maps
 

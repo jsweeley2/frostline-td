@@ -30,6 +30,7 @@ export default class Tower {
     this.disabledTimer = 0; // ms left disabled by an EMP
     this.parts = []; // game objects to clean up on destroy
     this.barrel = null; // rotating barrel for shooter towers
+    this.targetMode = 'first'; // first | last | close | strong (shooters)
 
     // Per-tower (upgradeable) stats, copied from the config so upgrades don't
     // mutate the shared template. Methods read these, not this.stats.<x>.
@@ -251,18 +252,32 @@ export default class Tower {
     }
   }
 
+  // Pick a target among in-range enemies according to targetMode:
+  //   first = furthest along the path (closest to base, the default)
+  //   last  = least far along        close = nearest to the tower
+  //   strong = most HP
   findTarget(enemies) {
     let best = null;
-    let bestDist = Infinity;
+    let bestScore = -Infinity;
     for (const e of enemies) {
       if (!e.alive) continue;
-      const d = Math.hypot(e.x - this.x, e.y - this.y);
-      if (d <= this.range && d < bestDist) {
-        bestDist = d;
-        best = e;
+      if (Math.hypot(e.x - this.x, e.y - this.y) > this.range) continue;
+      let score;
+      switch (this.targetMode) {
+        case 'last': score = -(e.pathIndex || 0); break;
+        case 'close': score = -Math.hypot(e.x - this.x, e.y - this.y); break;
+        case 'strong': score = e.hp; break;
+        default: score = e.pathIndex || 0; break; // 'first'
       }
+      if (score > bestScore) { bestScore = score; best = e; }
     }
     return best;
+  }
+
+  cycleTarget() {
+    const modes = ['first', 'last', 'close', 'strong'];
+    this.targetMode = modes[(modes.indexOf(this.targetMode) + 1) % modes.length];
+    return this.targetMode;
   }
 
   // ---- trap (Tripwire Hook) ----------------------------------------------

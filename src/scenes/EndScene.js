@@ -76,6 +76,15 @@ export default class EndScene extends Phaser.Scene {
       ? `WAVES SURVIVED: ${wave}        KILLS: ${kills}`
       : `WAVES REACHED: ${wave} / ${WAVES.length}        KILLS: ${kills}`;
     this.recap(cx, cy - 24, recap);
+    if (endless && this.result.best) {
+      const isBest = wave >= this.result.best;
+      this.add
+        .text(cx, cy + 2, isBest ? `NEW BEST!  WAVE ${this.result.best}` : `BEST: WAVE ${this.result.best}`, {
+          fontFamily: '"Courier New", monospace', fontSize: '13px',
+          color: isBest ? '#ffd23f' : '#9fc0ff', fontStyle: 'bold',
+        })
+        .setOrigin(0.5);
+    }
 
     const replay = { mode: 'solo', endless: this.result.endless, mapId: this.result.mapId };
     this.makeButton(cx, cy + 36, 'PLAY AGAIN', accent, '#04140a', () => this.go('GameScene', replay));

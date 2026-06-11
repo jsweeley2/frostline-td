@@ -295,7 +295,42 @@ export default class GameScene extends Phaser.Scene {
       cursor += group.count * group.gap;
     }
 
+    // Boss every 10th wave (modes with waves): a giant Juggernaut.
+    if (this.mode !== 'avd' && this.currentWave % 10 === 0) {
+      this.spawnBoss();
+      this.announceBoss();
+    }
+
     this.refreshWaveUi();
+  }
+
+  spawnBoss() {
+    const base = ENEMIES.juggernaut;
+    const tier = Math.floor(this.currentWave / 10); // 1, 2, 3, ...
+    const stats = {
+      ...base, name: 'Juggernaut Boss',
+      reward: base.reward * 4, color: 0x9b3bd1,
+    };
+    const hpScale = 4 + tier * 2;
+    this.pendingSpawns += 1;
+    this.time.delayedCall(600, () => {
+      this.pendingSpawns -= 1;
+      if (!this.path) return;
+      const e = new Enemy(this, stats, this.path, hpScale);
+      e.sprite.setScale(1.7);
+      this.enemies.push(e);
+    });
+  }
+
+  announceBoss() {
+    const t = this.add
+      .text(GAME_WIDTH / 2, GRID_Y + GRID_H / 2, 'WARNING: BOSS WAVE', {
+        fontFamily: '"Arial Black", system-ui, sans-serif', fontSize: '40px',
+        color: '#ff5a5a', fontStyle: 'bold',
+      })
+      .setOrigin(0.5).setDepth(12);
+    t.setShadow(0, 0, '#ff5a5a', 20, false, true);
+    this.tweens.add({ targets: t, alpha: { from: 1, to: 0 }, scale: { from: 0.9, to: 1.25 }, duration: 1600, onComplete: () => t.destroy() });
   }
 
   // Per-frame wave bookkeeping: detect the win, and auto-launch the next wave
@@ -360,11 +395,21 @@ export default class GameScene extends Phaser.Scene {
       this.scene.launch('EndScene', { avd: true, defenderWon: win, wave: this.currentWave, kills: this.kills, mapId });
       return;
     }
+    // Track the Endless best wave per map in localStorage.
+    let best = 0;
+    if (this.endless) {
+      const key = `frostline_best_${this.mapId}`;
+      try {
+        best = parseInt(localStorage.getItem(key) || '0', 10) || 0;
+        if (this.currentWave > best) { best = this.currentWave; localStorage.setItem(key, String(best)); }
+      } catch (e) { /* ignore */ }
+    }
     this.scene.launch('EndScene', {
       win,
       wave: this.currentWave,
       kills: this.kills,
       endless: this.endless,
+      best,
       mapId,
     });
   }
@@ -663,12 +708,17 @@ export default class GameScene extends Phaser.Scene {
       .setDepth(5)
       .setVisible(false);
 
-    // Floating info / upgrade / sell panel (top-left of the field).
-    const px = GRID_X + 12, py = GRID_Y + 12, pw = 252, ph = 140;
+    // Floating info / target / upgrade / sell panel (top-left of the field).
+    const px = GRID_X + 12, py = GRID_Y + 12, pw = 252, ph = 172;
     this.upPanel = this.add.container(px, py).setDepth(13).setVisible(false);
     const bg = this.add.rectangle(0, 0, pw, ph, 0x0d1a2b, 0.95).setOrigin(0).setStrokeStyle(2, 0x8fdcff, 0.6);
     this.upTitle = this.add.text(12, 8, '', { fontFamily: 'system-ui, sans-serif', fontSize: '15px', color: '#dfe9f5', fontStyle: 'bold' });
     this.upStats = this.add.text(12, 32, '', { fontFamily: 'system-ui, sans-serif', fontSize: '12px', color: '#9fc0ff', lineSpacing: 3 });
+
+    // Target-priority cycle (shooter towers only).
+    this.targetBtnBg = this.add.rectangle(12, ph - 96, pw - 24, 26, 0x274b66).setOrigin(0).setInteractive({ useHandCursor: true });
+    this.targetBtnText = this.add.text(pw / 2, ph - 83, '', { fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#dff4ff', fontStyle: 'bold' }).setOrigin(0.5);
+    this.targetBtnBg.on('pointerdown', () => this.cycleSelectedTarget());
 
     this.upBtnBg = this.add.rectangle(12, ph - 64, pw - 24, 26, COLORS.ghostOk).setOrigin(0).setInteractive({ useHandCursor: true });
     this.upBtnText = this.add.text(pw / 2, ph - 51, '', { fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#08240f', fontStyle: 'bold' }).setOrigin(0.5);
@@ -678,7 +728,16 @@ export default class GameScene extends Phaser.Scene {
     this.sellBtnText = this.add.text(pw / 2, ph - 19, '', { fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#2a1705', fontStyle: 'bold' }).setOrigin(0.5);
     this.sellBtnBg.on('pointerdown', () => this.sellSelected());
 
-    this.upPanel.add([bg, this.upTitle, this.upStats, this.upBtnBg, this.upBtnText, this.sellBtnBg, this.sellBtnText]);
+    this.upPanel.add([bg, this.upTitle, this.upStats, this.targetBtnBg, this.targetBtnText,
+      this.upBtnBg, this.upBtnText, this.sellBtnBg, this.sellBtnText]);
+  }
+
+  cycleSelectedTarget() {
+    const t = this.selectedTower;
+    if (!t || t.stats.kind !== 'shooter') return;
+    t.cycleTarget();
+    sfx.click();
+    this.refreshUpgradePanel();
   }
 
   selectTower(tower) {
@@ -715,6 +774,15 @@ export default class GameScene extends Phaser.Scene {
       if (t.chainCount) stats += `\nChains ${t.chainCount}`;
     }
     this.upStats.setText(stats);
+
+    // Target-priority button (shooters only).
+    const isShooter = t.stats.kind === 'shooter';
+    this.targetBtnBg.setVisible(isShooter);
+    this.targetBtnText.setVisible(isShooter);
+    if (isShooter) {
+      const labels = { first: 'First', last: 'Last', close: 'Closest', strong: 'Strongest' };
+      this.targetBtnText.setText(`Target: ${labels[t.targetMode]}`);
+    }
 
     if (!t.canUpgrade()) {
       this.upBtnText.setText('MAX LEVEL');
