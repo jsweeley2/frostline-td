@@ -44,7 +44,15 @@ Following the staged build order from the spec:
 - [x] **Upgrades + border** — click a tower to upgrade it (3 levels); decorative field frame
 - [x] **Title screen** — animated sci-fi title (aurora, starfield, ice planet) with a quote
 - [x] **2-player modes** — mode-select menu: Attacker vs Defender + Score Duel (see below)
+- [x] **Kill Shop** — every 5 cleared waves (solo), spend kills on stacking global perks
 - [ ] Step 10 — Polish pass (balance tuning)
+
+## Kill Shop
+
+In Solo, every 5th wave you clear pauses the game and opens a "Resupply" shop.
+Your **kills** are the currency; spend them on stacking global perks: +shield HP,
++12% tower damage, +10% fire rate, +25% credit bounty, or instant credits.
+Hit Continue to resume. Kill count shows in the HUD.
 
 ## Modes (mode-select menu after the title)
 

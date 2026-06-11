@@ -195,12 +195,12 @@ export default class Tower {
     } else {
       this.scene.bolt(this.x, this.y, target.x, target.y, color);
     }
-    target.takeDamage(this.damage);
+    target.takeDamage(this.damage * (this.scene.dmgMult || 1));
 
     if (this.splashRadius) this.fireSplash(target, enemies);
     if (this.chainCount) this.fireChain(target, enemies);
 
-    this.cooldown = this.fireRateMs;
+    this.cooldown = this.fireRateMs / (this.scene.rateMult || 1);
   }
 
   // Flash at the tip of the rotating barrel.
@@ -218,7 +218,7 @@ export default class Tower {
     for (const e of enemies) {
       if (!e.alive || e === target) continue;
       if (Math.hypot(e.x - target.x, e.y - target.y) <= this.splashRadius) {
-        e.takeDamage(this.damage);
+        e.takeDamage(this.damage * (this.scene.dmgMult || 1));
       }
     }
   }
@@ -226,7 +226,7 @@ export default class Tower {
   fireChain(target, enemies) {
     const hit = new Set([target]);
     let from = target;
-    let dmg = this.damage * this.chainFalloff;
+    let dmg = this.damage * this.chainFalloff * (this.scene.dmgMult || 1);
     for (let i = 0; i < this.chainCount; i++) {
       let next = null;
       let bestDist = Infinity;
@@ -275,7 +275,7 @@ export default class Tower {
       if (!e.alive || !e.stats.triggersTripwire) continue;
       const d = Math.hypot(e.x - this.x, e.y - this.y);
       if (d <= this.triggerRadius) {
-        e.takeDamage(this.damage);
+        e.takeDamage(this.damage * (this.scene.dmgMult || 1));
         e.immobilize(this.immobilizeMs);
         this.cooldown = this.cooldownMs;
         this.setArmed(false);
@@ -294,7 +294,7 @@ export default class Tower {
   // ---- slow aura (Frost Tower) -------------------------------------------
 
   updateSlow(deltaMs, enemies) {
-    const dot = (this.damagePerSec || 0) * (deltaMs / 1000);
+    const dot = (this.damagePerSec || 0) * (deltaMs / 1000) * (this.scene.dmgMult || 1);
     for (const e of enemies) {
       if (!e.alive) continue;
       if (Math.hypot(e.x - this.x, e.y - this.y) <= this.range) {

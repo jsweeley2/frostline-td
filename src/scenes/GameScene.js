@@ -59,9 +59,16 @@ export default class GameScene extends Phaser.Scene {
     this.baseHp = level1.baseHp;
     this.enemies = [];
     this.towers = [];
-    this.kills = 0;
+    this.kills = 0; // lifetime kills (score)
+    this.killPoints = 0; // spendable currency for the Kill Shop
     this.credits = STARTING_CREDITS;
     this.selectedTool = null; // currently selected tower type, or null
+
+    // Global perk multipliers (raised by the every-5-waves Kill Shop).
+    this.dmgMult = 1;
+    this.rateMult = 1;
+    this.creditMult = 1;
+    this.lastShopWave = 0; // last milestone wave that opened the shop
 
     // Wave state. Waves may overlap: the next can be launched before the
     // previous is cleared, so we track total launched + total pending spawns
@@ -285,6 +292,20 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
+    // Kill Shop: every 5th cleared wave (solo only), pause and open the shop
+    // before the next wave can start.
+    if (
+      this.mode === 'solo' &&
+      !this.waveInProgress &&
+      this.currentWave > 0 &&
+      this.currentWave % 5 === 0 &&
+      this.currentWave !== this.lastShopWave
+    ) {
+      this.lastShopWave = this.currentWave;
+      this.openShop();
+      return;
+    }
+
     if (
       this.autoStart &&
       !this.autoStartPending &&
@@ -503,9 +524,33 @@ export default class GameScene extends Phaser.Scene {
 
   onEnemyKilled(enemy) {
     this.kills += 1;
-    this.credits += enemy.stats.reward || 0;
+    this.killPoints += 1; // spendable in the Kill Shop
+    this.credits += Math.round((enemy.stats.reward || 0) * this.creditMult);
     this.enemyDeathFx(enemy.x, enemy.y, enemy.stats.color);
     this.updateHud();
+  }
+
+  // ---- Kill Shop (every 5 waves, spend kills) ----------------------------
+
+  openShop() {
+    this.scene.pause();
+    this.scene.launch('ShopScene', { wave: this.currentWave });
+  }
+
+  // Buy a perk by id, spending kill points. Returns true on success.
+  buyPerk(perk) {
+    if (this.killPoints < perk.cost) return false;
+    this.killPoints -= perk.cost;
+    switch (perk.id) {
+      case 'shield': this.baseHp += 30; break;
+      case 'damage': this.dmgMult += 0.12; break;
+      case 'rate': this.rateMult += 0.10; break;
+      case 'bounty': this.creditMult += 0.25; break;
+      case 'funds': this.credits += 80; break;
+      default: break;
+    }
+    this.updateHud();
+    return true;
   }
 
   // ---- input -------------------------------------------------------------
@@ -877,6 +922,7 @@ export default class GameScene extends Phaser.Scene {
   }
 
   updateHud() {
+    if (!this.hudText) return; // UI not built yet
     let label;
     if (this.mode === 'avd') {
       const s = Math.max(0, Math.ceil((this.surviveLeft || 0) / 1000));
@@ -888,7 +934,8 @@ export default class GameScene extends Phaser.Scene {
         ? `Wave ${this.currentWave} (Endless)`
         : `Wave ${this.currentWave}/${WAVES.length}`;
     }
-    this.hudText.setText(`${label}     Credits ${this.credits}     Shield ${this.baseHp}`);
+    const killsPart = this.mode === 'solo' ? `     Kills ${this.killPoints}` : '';
+    this.hudText.setText(`${label}     Credits ${this.credits}     Shield ${this.baseHp}${killsPart}`);
     this.refreshToolButtons();
     // Keep the upgrade panel's affordability current as credits change.
     if (this.selectedTower) this.refreshUpgradePanel();

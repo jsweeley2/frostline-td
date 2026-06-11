@@ -31,6 +31,16 @@ export const SPEED_STEPS = [1, 2, 3];
 // Game-time delay before an auto-started wave begins once the field is clear.
 export const AUTO_START_DELAY_MS = 2000;
 
+// Kill Shop: every 5 cleared waves (solo), spend kills on these global perks.
+// They stack, so buying the same one again keeps boosting it.
+export const PERKS = [
+  { id: 'shield', name: 'Reinforce Shield', desc: '+30 shield HP', cost: 18 },
+  { id: 'damage', name: 'Overcharge Weapons', desc: '+12% tower damage', cost: 30 },
+  { id: 'rate', name: 'Coolant Injector', desc: '+10% tower fire rate', cost: 30 },
+  { id: 'bounty', name: 'Bounty Protocol', desc: '+25% credits per kill', cost: 24 },
+  { id: 'funds', name: 'Emergency Funds', desc: '+80 credits now', cost: 14 },
+];
+
 // Attacker vs Defender (2-player): the attacker spends regenerating "menace"
 // points to send waves with number keys; the defender must survive surviveMs.
 export const AVD = {
