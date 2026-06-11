@@ -237,6 +237,6 @@ export default class TitleScene extends Phaser.Scene {
     if (this.started) return;
     this.started = true;
     this.cameras.main.fadeOut(320, 0, 0, 0);
-    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('GameScene'));
+    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('ModeSelectScene'));
   }
 }

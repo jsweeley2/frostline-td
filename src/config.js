@@ -31,6 +31,23 @@ export const SPEED_STEPS = [1, 2, 3];
 // Game-time delay before an auto-started wave begins once the field is clear.
 export const AUTO_START_DELAY_MS = 2000;
 
+// Attacker vs Defender (2-player): the attacker spends regenerating "menace"
+// points to send waves with number keys; the defender must survive surviveMs.
+export const AVD = {
+  surviveMs: 150000, // defender wins if the shield lasts this long (2.5 min)
+  startMenace: 25,
+  menaceRegenPerSec: 6,
+  maxMenace: 120,
+  startCredits: 250, // defender starts richer (no preset waves to grind early)
+  units: [
+    { key: 'runner', label: 'Runner', cost: 5 },
+    { key: 'lightScout', label: 'Scout', cost: 7 },
+    { key: 'disruptor', label: 'Disruptor', cost: 16 },
+    { key: 'heavyWalker', label: 'Walker', cost: 20 },
+    { key: 'juggernaut', label: 'Juggernaut', cost: 45 },
+  ],
+};
+
 // Each tower of a given type costs a bit more than the last one you built
 // (multiplied by this per existing tower of that type), so spamming one tower
 // gets pricier. Selling refunds this fraction of everything spent on a tower.

@@ -43,7 +43,19 @@ Following the staged build order from the spec:
 - [x] **Art pass** — original sprite art (baked in code in `src/art.js`), combat effects, animations
 - [x] **Upgrades + border** — click a tower to upgrade it (3 levels); decorative field frame
 - [x] **Title screen** — animated sci-fi title (aurora, starfield, ice planet) with a quote
+- [x] **2-player modes** — mode-select menu: Attacker vs Defender + Score Duel (see below)
 - [ ] Step 10 — Polish pass (balance tuning)
+
+## Modes (mode-select menu after the title)
+
+- **Solo Defense** — the normal 1-player game (Campaign or Endless).
+- **Attacker vs Defender (2P)** — one player builds towers with the mouse; the
+  other player presses number keys **1-5** to spend regenerating *menace* and
+  send enemies (Runner / Scout / Disruptor / Walker / Juggernaut). The defender
+  wins if the shield survives the countdown; the attacker wins if it falls.
+- **Score Duel (2P)** — players take turns surviving Endless. When the shield
+  falls, the other player takes over; the higher wave reached (kills as
+  tiebreak) wins.
 
 ## Upgrading towers
 

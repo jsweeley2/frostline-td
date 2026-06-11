@@ -20,6 +20,7 @@ import {
   AUTO_START_DELAY_MS,
   COST_GROWTH,
   SELL_REFUND,
+  AVD,
 } from '../config.js';
 import { cellCenter, pixelToCell, inBounds } from '../grid.js';
 import { level1 } from '../maps/level1.js';
@@ -43,9 +44,14 @@ export default class GameScene extends Phaser.Scene {
     super({ key: 'GameScene', active: false });
   }
 
-  // Receives { endless } when started from the title or "Play Again".
+  // Receives { mode, player, endless } when started from mode select / replay.
+  //   mode: 'solo' (default) | 'avd' (attacker vs defender) | 'duel' (score duel)
   init(data) {
-    this.startEndless = !!(data && data.endless);
+    data = data || {};
+    this.mode = data.mode || 'solo';
+    this.duelPlayer = data.player || 1;
+    // Score Duel is always an Endless survival race.
+    this.startEndless = this.mode === 'duel' ? true : !!data.endless;
   }
 
   create() {
@@ -95,7 +101,36 @@ export default class GameScene extends Phaser.Scene {
     this.createInput();
     this.createUi();
 
+    this.setupMode();
     this.refreshWaveUi();
+  }
+
+  // Apply per-mode setup once the board + UI exist.
+  setupMode() {
+    if (this.mode === 'duel') {
+      // Score Duel: an Endless survival race, auto-running so the idle player
+      // can't stall. Hide wave controls; show whose turn + score.
+      this.autoStart = true;
+      this.modeBtn?.bg.setVisible(false); this.modeBtn?.label.setVisible(false);
+      this.autoBtn?.bg.setVisible(false); this.autoBtn?.label.setVisible(false);
+      this.nextWaveBtn?.bg.setVisible(false); this.nextWaveBtn?.label.setVisible(false);
+      this.launchWave(); // kick off the first wave immediately
+    } else if (this.mode === 'avd') {
+      // Attacker vs Defender: no preset waves. Defender builds; attacker sends
+      // units with number keys, spending regenerating menace. Survive the timer.
+      this.credits = AVD.startCredits;
+      this.menace = AVD.startMenace;
+      this.surviveLeft = AVD.surviveMs;
+      this.modeBtn?.bg.setVisible(false); this.modeBtn?.label.setVisible(false);
+      this.autoBtn?.bg.setVisible(false); this.autoBtn?.label.setVisible(false);
+      this.nextWaveBtn?.bg.setVisible(false); this.nextWaveBtn?.label.setVisible(false);
+      this.createAttackerUi();
+      const K = Phaser.Input.Keyboard.KeyCodes;
+      [K.ONE, K.TWO, K.THREE, K.FOUR, K.FIVE].forEach((code, i) => {
+        this.input.keyboard?.on(`keydown-${['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'][i]}`, () => this.sendAttackUnit(i));
+      });
+    }
+    this.updateHud();
   }
 
   // ---- pathfinding -------------------------------------------------------
@@ -264,11 +299,23 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  // Freeze the game and show the win/lose overlay. Guarded so it fires once.
+  // Freeze the game and show the right end overlay. Guarded so it fires once.
+  // `win` means: solo = cleared all waves; avd = defender survived the timer.
   endGame(win) {
     if (this.gameEnded) return;
     this.gameEnded = true;
     this.scene.pause();
+
+    if (this.mode === 'duel') {
+      // Record this player's survival score, then advance the duel.
+      const score = { wave: this.currentWave, kills: this.kills };
+      this.scene.launch('EndScene', { duel: true, player: this.duelPlayer, score });
+      return;
+    }
+    if (this.mode === 'avd') {
+      this.scene.launch('EndScene', { avd: true, defenderWon: win, wave: this.currentWave, kills: this.kills });
+      return;
+    }
     this.scene.launch('EndScene', {
       win,
       wave: this.currentWave,
@@ -292,7 +339,55 @@ export default class GameScene extends Phaser.Scene {
     for (const tower of this.towers) tower.update(dt, this.enemies);
     for (const enemy of this.enemies) enemy.update(dt);
     this.enemies = this.enemies.filter((e) => e.alive);
-    this.updateWaves();
+    if (this.mode === 'avd') this.updateAvd(dt);
+    else this.updateWaves();
+  }
+
+  // ---- Attacker vs Defender ----------------------------------------------
+
+  updateAvd(dt) {
+    if (this.gameEnded) return;
+    // Regenerate the attacker's menace points.
+    this.menace = Math.min(AVD.maxMenace, this.menace + (AVD.menaceRegenPerSec * dt) / 1000);
+    // Tick the survival timer; defender wins if it runs out.
+    this.surviveLeft -= dt;
+    if (this.surviveLeft <= 0) {
+      this.surviveLeft = 0;
+      this.endGame(true); // defender survived
+      return;
+    }
+    this.updateAttackerUi();
+    this.updateHud();
+  }
+
+  // Attacker presses 1-5 to spend menace and send a unit from the entry.
+  sendAttackUnit(index) {
+    if (this.mode !== 'avd' || this.gameEnded) return;
+    const unit = AVD.units[index];
+    if (!unit || this.menace < unit.cost) return;
+    this.menace -= unit.cost;
+    this.spawnEnemy(ENEMIES[unit.key], 1);
+    this.updateAttackerUi();
+  }
+
+  createAttackerUi() {
+    // Attacker control panel in the top bar, right side (where the hidden wave
+    // controls were). The defender keeps the bottom tower palette.
+    this.attackerText = this.add
+      .text(GAME_WIDTH - 14, 6, '', {
+        fontFamily: '"Courier New", monospace', fontSize: '12px',
+        color: '#ff9a7a', align: 'right', lineSpacing: 3, fontStyle: 'bold',
+      })
+      .setOrigin(1, 0).setDepth(11);
+    this.updateAttackerUi();
+  }
+
+  updateAttackerUi() {
+    if (!this.attackerText) return;
+    const legend = AVD.units
+      .map((u, i) => `[${i + 1}] ${u.label} ${u.cost}`)
+      .join('   ');
+    this.attackerText.setText(`ATTACKER  ·  MENACE ${Math.floor(this.menace)}/${AVD.maxMenace}\n${legend}`);
   }
 
   // Brief shot tracer from tower to target, fading out. (Kept as a simple
@@ -782,12 +877,18 @@ export default class GameScene extends Phaser.Scene {
   }
 
   updateHud() {
-    const waveLabel = this.endless
-      ? `Wave ${this.currentWave} (Endless)`
-      : `Wave ${this.currentWave}/${WAVES.length}`;
-    this.hudText.setText(
-      `${waveLabel}     Credits ${this.credits}     Shield ${this.baseHp}`
-    );
+    let label;
+    if (this.mode === 'avd') {
+      const s = Math.max(0, Math.ceil((this.surviveLeft || 0) / 1000));
+      label = `Defend  ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    } else if (this.mode === 'duel') {
+      label = `Player ${this.duelPlayer}  ·  Wave ${this.currentWave}`;
+    } else {
+      label = this.endless
+        ? `Wave ${this.currentWave} (Endless)`
+        : `Wave ${this.currentWave}/${WAVES.length}`;
+    }
+    this.hudText.setText(`${label}     Credits ${this.credits}     Shield ${this.baseHp}`);
     this.refreshToolButtons();
     // Keep the upgrade panel's affordability current as credits change.
     if (this.selectedTower) this.refreshUpgradePanel();
@@ -814,6 +915,12 @@ export default class GameScene extends Phaser.Scene {
   refreshWaveUi() {
     this.updateHud();
 
+    // Only Solo uses the manual Next-Wave button; 2P modes hide it.
+    if (this.mode !== 'solo') {
+      this.nextWaveBtn.bg.setVisible(false);
+      this.nextWaveBtn.label.setVisible(false);
+      return;
+    }
     // In Endless mode there's always a next wave to launch.
     const canLaunch =
       !this.allWavesCleared && (this.endless || this.currentWave < WAVES.length);
