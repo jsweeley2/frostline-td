@@ -48,8 +48,17 @@ export default class ModeSelectScene extends Phaser.Scene {
     this.card(cx, H * 0.70, 'SCORE DUEL  (2P)', 'Take turns surviving Endless. Highest wave reached wins.',
       0x39c06a, () => this.startDuel());
 
+    const howto = this.add
+      .text(cx, H * 0.84, 'HOW TO PLAY', {
+        fontFamily: 'system-ui, sans-serif', fontSize: '16px', color: '#6fd0ff', fontStyle: 'bold',
+      })
+      .setOrigin(0.5).setInteractive({ useHandCursor: true });
+    howto.on('pointerover', () => howto.setScale(1.08));
+    howto.on('pointerout', () => howto.setScale(1));
+    howto.on('pointerdown', () => this.scene.start('HowToScene', { back: 'ModeSelectScene' }));
+
     this.add
-      .text(cx, H * 0.88, 'ESC  ·  back to title', {
+      .text(cx, H * 0.9, 'ESC  ·  back to title', {
         fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#5f9fc0',
       })
       .setOrigin(0.5);

@@ -46,6 +46,7 @@ Following the staged build order from the spec:
 - [x] **2-player modes** — mode-select menu: Attacker vs Defender + Score Duel (see below)
 - [x] **Kill Shop** — every 5 cleared waves (solo), spend kills on stacking global perks
 - [x] **Maps** — map picker; freeform maze + fixed-path lane maps (see below)
+- [x] **Feel pass** — synth sound effects (M mutes), floating credit/damage numbers, pause (P), how-to screen, tower tooltips
 - [ ] Step 10 — Polish pass (balance tuning)
 
 ## Maps

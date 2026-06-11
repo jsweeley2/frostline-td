@@ -1,5 +1,6 @@
 import { TILE, COLORS } from '../config.js';
 import { cellCenter } from '../grid.js';
+import { sfx } from '../audio.js';
 
 // ---------------------------------------------------------------------------
 // Tower — occupies one grid cell. The `kind` (from stats) picks its behavior:
@@ -192,8 +193,10 @@ export default class Tower {
     if (this.barrel) this.muzzleFlash();
     if (this.chainCount) {
       this.scene.lightning(this.x, this.y, target.x, target.y, color);
+      sfx.zap();
     } else {
       this.scene.bolt(this.x, this.y, target.x, target.y, color);
+      if (!this.splashRadius) sfx.shoot(); // plasma's boom comes from explosion()
     }
     target.takeDamage(this.damage * (this.scene.dmgMult || 1));
 
@@ -279,6 +282,7 @@ export default class Tower {
         e.immobilize(this.immobilizeMs);
         this.cooldown = this.cooldownMs;
         this.setArmed(false);
+        sfx.boom();
         break;
       }
     }

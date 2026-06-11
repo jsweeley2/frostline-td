@@ -27,6 +27,7 @@ import { MAPS, DEFAULT_MAP } from '../maps/maps.js';
 import { WAVES, getWave } from '../maps/waves.js';
 import { findPath } from '../pathfinding/astar.js';
 import { buildGameTextures } from '../art.js';
+import { sfx } from '../audio.js';
 import Enemy from '../entities/Enemy.js';
 import Tower from '../entities/Tower.js';
 
@@ -235,6 +236,7 @@ export default class GameScene extends Phaser.Scene {
     tower.spent = cost; // tracked for sell refunds (grows with upgrades)
     this.towers.push(tower);
     this.placeFx(tower.x, tower.y);
+    sfx.place();
     if (!this.fixedPath && stats.blocks) {
       this.blocked[row][col] = true;
       this.recomputePath();
@@ -253,6 +255,7 @@ export default class GameScene extends Phaser.Scene {
       this.recomputePath();
     }
     this.placeFx(tower.x, tower.y);
+    sfx.sell();
     tower.destroy();
     this.deselectTower();
     this.updateHud();
@@ -274,6 +277,7 @@ export default class GameScene extends Phaser.Scene {
     if (!this.endless && this.currentWave >= WAVES.length) return;
 
     this.currentWave += 1;
+    sfx.wave();
     const wave = getWave(this.currentWave);
     const hpScale = wave.hpScale || 1;
     let cursor = 0; // ms offset from wave start
@@ -343,6 +347,7 @@ export default class GameScene extends Phaser.Scene {
     if (this.gameEnded) return;
     this.gameEnded = true;
     this.scene.pause();
+    if (win) sfx.win(); else sfx.lose();
 
     const mapId = this.mapId;
     if (this.mode === 'duel') {
@@ -514,6 +519,7 @@ export default class GameScene extends Phaser.Scene {
 
   // Plasma splash: an expanding filled blast plus a bright shock ring.
   explosion(x, y, radius, color) {
+    sfx.boom();
     const c = this.add.circle(x, y, radius, color, 0.45).setDepth(5);
     this.tweens.add({ targets: c, scale: { from: 0.4, to: 1.15 }, alpha: 0, duration: 240, onComplete: () => c.destroy() });
     const ring = this.add.circle(x, y, radius).setStrokeStyle(3, 0xffffff, 0.9).setDepth(6);
@@ -534,9 +540,22 @@ export default class GameScene extends Phaser.Scene {
 
   // ---- enemy outcomes ----------------------------------------------------
 
+  // A small number that rises and fades (credit gains, base damage, etc.).
+  floatNumber(x, y, str, color) {
+    const t = this.add
+      .text(x, y, str, {
+        fontFamily: 'system-ui, sans-serif', fontSize: '15px', color, fontStyle: 'bold',
+      })
+      .setOrigin(0.5).setDepth(7);
+    this.tweens.add({ targets: t, y: y - 26, alpha: 0, duration: 700, ease: 'Cubic.Out', onComplete: () => t.destroy() });
+  }
+
   onEnemyReachBase(enemy) {
     this.baseHp = Math.max(0, this.baseHp - enemy.damage);
     this.baseHitFx();
+    sfx.hit();
+    const b = cellCenter(this.level.base.col, this.level.base.row);
+    this.floatNumber(b.x, b.y - 18, `-${enemy.damage}`, '#ff7a5e');
     this.updateHud();
     if (this.baseHp <= 0) this.endGame(false);
   }
@@ -544,8 +563,11 @@ export default class GameScene extends Phaser.Scene {
   onEnemyKilled(enemy) {
     this.kills += 1;
     this.killPoints += 1; // spendable in the Kill Shop
-    this.credits += Math.round((enemy.stats.reward || 0) * this.creditMult);
+    const reward = Math.round((enemy.stats.reward || 0) * this.creditMult);
+    this.credits += reward;
     this.enemyDeathFx(enemy.x, enemy.y, enemy.stats.color);
+    sfx.kill();
+    if (reward > 0) this.floatNumber(enemy.x, enemy.y, `+${reward}`, '#9be88a');
     this.updateHud();
   }
 
@@ -612,8 +634,20 @@ export default class GameScene extends Phaser.Scene {
     // U upgrades the selected tower; S sells it.
     this.input.keyboard?.on('keydown-U', () => this.upgradeSelected());
     this.input.keyboard?.on('keydown-S', () => this.sellSelected());
+    // P pauses; M toggles sound.
+    this.input.keyboard?.on('keydown-P', () => this.openPause());
+    this.input.keyboard?.on('keydown-M', () => {
+      const muted = sfx.toggle();
+      this.floatNumber(GAME_WIDTH / 2, GRID_Y + 30, muted ? 'SOUND OFF' : 'SOUND ON', '#9fc0ff');
+    });
 
     this.createUpgradeUi();
+  }
+
+  openPause() {
+    if (this.gameEnded || this.scene.isActive('ShopScene')) return;
+    this.scene.pause();
+    this.scene.launch('PauseScene', { mapId: this.mapId, mode: this.mode });
   }
 
   // ---- tower selection + upgrades ----------------------------------------
@@ -705,6 +739,7 @@ export default class GameScene extends Phaser.Scene {
     t.spent = (t.spent || t.stats.cost) + cost; // counts toward sell refund
     t.upgrade();
     this.placeFx(t.x, t.y);
+    sfx.upgrade();
     if (t.range) this.selectRange.setRadius(t.range);
     this.updateHud();
     this.refreshUpgradePanel();
@@ -879,6 +914,11 @@ export default class GameScene extends Phaser.Scene {
 
     bg.on('pointerdown', () => {
       this.selectTool(this.selectedTool === stats ? null : stats);
+    });
+    // Hover tooltip: show this tower's ability in the hint line.
+    bg.on('pointerover', () => this.hintText.setText(stats.desc));
+    bg.on('pointerout', () => {
+      this.hintText.setText(this.selectedTool ? this.selectedTool.desc : '');
     });
 
     return { bg, label, stats };
