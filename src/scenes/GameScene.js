@@ -23,7 +23,7 @@ import {
   AVD,
 } from '../config.js';
 import { cellCenter, pixelToCell, inBounds } from '../grid.js';
-import { level1 } from '../maps/level1.js';
+import { MAPS, DEFAULT_MAP } from '../maps/maps.js';
 import { WAVES, getWave } from '../maps/waves.js';
 import { findPath } from '../pathfinding/astar.js';
 import { buildGameTextures } from '../art.js';
@@ -50,13 +50,19 @@ export default class GameScene extends Phaser.Scene {
     data = data || {};
     this.mode = data.mode || 'solo';
     this.duelPlayer = data.player || 1;
+    this.mapId = data.mapId || DEFAULT_MAP;
     // Score Duel is always an Endless survival race.
     this.startEndless = this.mode === 'duel' ? true : !!data.endless;
   }
 
   create() {
-    this.level = level1;
-    this.baseHp = level1.baseHp;
+    this.level = MAPS[this.mapId] || MAPS[DEFAULT_MAP];
+    this.baseHp = this.level.baseHp;
+    // Fixed-path maps: enemies follow a preset lane; towers never block it.
+    this.fixedPath = this.level.type === 'fixed';
+    this.pathCellSet = this.fixedPath
+      ? new Set(this.level.path.map((c) => `${c.col},${c.row}`))
+      : null;
     this.enemies = [];
     this.towers = [];
     this.kills = 0; // lifetime kills (score)
@@ -160,6 +166,12 @@ export default class GameScene extends Phaser.Scene {
   // every live enemy from its current cell so a freshly-placed tower takes
   // effect immediately without making anyone backtrack.
   recomputePath() {
+    // Fixed-path maps use the preset lane; towers never reroute it.
+    if (this.fixedPath) {
+      this.path = this.level.path;
+      this.drawPath();
+      return;
+    }
     this.path = this.findPathFrom(this.level.spawn);
     this.drawPath();
 
@@ -200,6 +212,11 @@ export default class GameScene extends Phaser.Scene {
     if (stats && this.atMax(stats)) return false; // hit the build cap
     if (stats && this.costToBuild(stats) > this.credits) return false; // can't afford
 
+    // Fixed-path maps: build anywhere except on the lane itself; nothing blocks.
+    if (this.fixedPath) {
+      return !this.pathCellSet.has(`${col},${row}`);
+    }
+
     if (stats && stats.blocks) {
       // Tentatively block it and confirm a path still exists.
       this.blocked[row][col] = true;
@@ -218,7 +235,7 @@ export default class GameScene extends Phaser.Scene {
     tower.spent = cost; // tracked for sell refunds (grows with upgrades)
     this.towers.push(tower);
     this.placeFx(tower.x, tower.y);
-    if (stats.blocks) {
+    if (!this.fixedPath && stats.blocks) {
       this.blocked[row][col] = true;
       this.recomputePath();
     }
@@ -231,7 +248,7 @@ export default class GameScene extends Phaser.Scene {
     this.credits += refund;
     this.occupied[tower.row][tower.col] = false;
     this.towers = this.towers.filter((t) => t !== tower);
-    if (tower.stats.blocks) {
+    if (!this.fixedPath && tower.stats.blocks) {
       this.blocked[tower.row][tower.col] = false;
       this.recomputePath();
     }
@@ -327,14 +344,15 @@ export default class GameScene extends Phaser.Scene {
     this.gameEnded = true;
     this.scene.pause();
 
+    const mapId = this.mapId;
     if (this.mode === 'duel') {
       // Record this player's survival score, then advance the duel.
       const score = { wave: this.currentWave, kills: this.kills };
-      this.scene.launch('EndScene', { duel: true, player: this.duelPlayer, score });
+      this.scene.launch('EndScene', { duel: true, player: this.duelPlayer, score, mapId });
       return;
     }
     if (this.mode === 'avd') {
-      this.scene.launch('EndScene', { avd: true, defenderWon: win, wave: this.currentWave, kills: this.kills });
+      this.scene.launch('EndScene', { avd: true, defenderWon: win, wave: this.currentWave, kills: this.kills, mapId });
       return;
     }
     this.scene.launch('EndScene', {
@@ -342,6 +360,7 @@ export default class GameScene extends Phaser.Scene {
       wave: this.currentWave,
       kills: this.kills,
       endless: this.endless,
+      mapId,
     });
   }
 

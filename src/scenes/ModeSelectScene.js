@@ -94,6 +94,6 @@ export default class ModeSelectScene extends Phaser.Scene {
 
   start(data) {
     this.cameras.main.fadeOut(260, 0, 0, 0);
-    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('GameScene', data));
+    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('MapSelectScene', data));
   }
 }

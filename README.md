@@ -45,7 +45,16 @@ Following the staged build order from the spec:
 - [x] **Title screen** — animated sci-fi title (aurora, starfield, ice planet) with a quote
 - [x] **2-player modes** — mode-select menu: Attacker vs Defender + Score Duel (see below)
 - [x] **Kill Shop** — every 5 cleared waves (solo), spend kills on stacking global perks
+- [x] **Maps** — map picker; freeform maze + fixed-path lane maps (see below)
 - [ ] Step 10 — Polish pass (balance tuning)
+
+## Maps
+
+After picking a mode you choose a map:
+- **Open Snowfield** (maze) — freeform; towers act as walls and the route is
+  found with A* (the original mode).
+- **Switchback Pass / The Gauntlet** (fixed path) — classic lane TD: enemies
+  follow a preset winding lane and towers are placed beside it (they don't block).
 
 ## Kill Shop
 
