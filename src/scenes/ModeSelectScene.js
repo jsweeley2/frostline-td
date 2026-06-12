@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config.js';
+import { MAP_ORDER } from '../maps/maps.js';
 
 // ---------------------------------------------------------------------------
 // ModeSelectScene — pick how to play. Reached from the title screen.
@@ -41,15 +42,17 @@ export default class ModeSelectScene extends Phaser.Scene {
     head.setShadow(0, 0, '#3fd0ff', 22, false, true);
 
     // Mode cards.
-    this.card(cx, H * 0.36, 'SOLO DEFENSE', 'Hold the line alone across 20 waves (or Endless).',
+    this.card(cx, H * 0.30, 'SOLO DEFENSE', 'Hold the line alone across 20 waves (or Endless).',
       0x6fd0ff, () => this.start({ mode: 'solo' }));
-    this.card(cx, H * 0.53, 'ATTACKER vs DEFENDER', '2 players: one builds towers, one sends the waves (keys 1-5).',
+    this.card(cx, H * 0.445, 'ATTACKER vs DEFENDER', '2 players: one builds towers, one sends the waves (keys 1-5).',
       0xe05a47, () => this.start({ mode: 'avd' }));
-    this.card(cx, H * 0.70, 'SCORE DUEL  (2P)', 'Take turns surviving Endless. Highest wave reached wins.',
+    this.card(cx, H * 0.59, 'SCORE DUEL  (2P)', 'Take turns surviving Endless. Highest wave reached wins.',
       0x39c06a, () => this.startDuel());
+    this.card(cx, H * 0.735, 'DAILY CHALLENGE', "Today's set map + mutators, same for everyone. Endless.",
+      0xffd23f, () => this.startDaily());
 
     const howto = this.add
-      .text(cx, H * 0.84, 'HOW TO PLAY', {
+      .text(cx, H * 0.85, 'HOW TO PLAY', {
         fontFamily: 'system-ui, sans-serif', fontSize: '16px', color: '#6fd0ff', fontStyle: 'bold',
       })
       .setOrigin(0.5).setInteractive({ useHandCursor: true });
@@ -99,6 +102,24 @@ export default class ModeSelectScene extends Phaser.Scene {
     this.registry.set('duelP1', null);
     this.registry.set('duelP2', null);
     this.start({ mode: 'duel', player: 1 });
+  }
+
+  // Deterministic map + mutators from the calendar date (same for everyone
+  // today). Skips the map picker and goes straight into an Endless run.
+  startDaily() {
+    const now = new Date();
+    const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+    const seed = now.getFullYear() * 1000 + dayOfYear;
+    const mapId = MAP_ORDER[seed % MAP_ORDER.length];
+    const mutators = {};
+    if (seed % 2 === 0) mutators.rush = true;
+    if (seed % 3 === 0) mutators.glass = true;
+    if (seed % 5 === 0) mutators.blizzard = true;
+    if (seed % 7 === 0) mutators.frugal = true;
+    this.cameras.main.fadeOut(260, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () =>
+      this.scene.start('GameScene', { mode: 'solo', endless: true, mapId, mutators, daily: true })
+    );
   }
 
   start(data) {
