@@ -109,7 +109,8 @@ export default class Enemy {
     const dx = target.x - this.x;
     const dy = target.y - this.y;
     const dist = Math.hypot(dx, dy);
-    const step = (this.speed * this.slowFactor * deltaMs) / 1000;
+    const speedMult = this.scene.enemySpeedMult || 1;
+    const step = (this.speed * this.slowFactor * speedMult * deltaMs) / 1000;
 
     if (step >= dist) {
       this.x = target.x;

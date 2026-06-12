@@ -86,7 +86,7 @@ export default class EndScene extends Phaser.Scene {
         .setOrigin(0.5);
     }
 
-    const replay = { mode: 'solo', endless: this.result.endless, mapId: this.result.mapId };
+    const replay = { mode: 'solo', endless: this.result.endless, mapId: this.result.mapId, mutators: this.result.mutators };
     this.makeButton(cx, cy + 36, 'PLAY AGAIN', accent, '#04140a', () => this.go('GameScene', replay));
     this.makeButton(cx, cy + 100, 'MAIN MENU', 0x6fd0ff, '#04161f', () => this.go('ModeSelectScene'));
     this.input.keyboard?.on('keydown-ENTER', () => this.go('GameScene', replay));
@@ -107,7 +107,7 @@ export default class EndScene extends Phaser.Scene {
         : 'The shield generator was destroyed. Attacker wins!', pw);
     this.recap(cx, cy - 22, `ENEMIES DESTROYED: ${kills}`);
 
-    this.makeButton(cx, cy + 38, 'REMATCH', accent, '#04140a', () => this.go('GameScene', { mode: 'avd', mapId: this.result.mapId }));
+    this.makeButton(cx, cy + 38, 'REMATCH', accent, '#04140a', () => this.go('GameScene', { mode: 'avd', mapId: this.result.mapId, mutators: this.result.mutators }));
     this.makeButton(cx, cy + 102, 'MAIN MENU', 0x6fd0ff, '#04161f', () => this.go('ModeSelectScene'));
     this.input.keyboard?.on('keydown-ESC', () => this.go('ModeSelectScene'));
   }
@@ -125,7 +125,7 @@ export default class EndScene extends Phaser.Scene {
       this.subtitle(cx, cy - 58, 'Pass the controls. Player 2, defend the shield!', pw);
       this.recap(cx, cy - 20, `PLAYER 1  —  WAVE ${score.wave}   ·   KILLS ${score.kills}`);
       this.makeButton(cx, cy + 40, 'PLAYER 2 START', 0x39c06a, '#04140a',
-        () => this.go('GameScene', { mode: 'duel', player: 2, mapId: this.result.mapId }));
+        () => this.go('GameScene', { mode: 'duel', player: 2, mapId: this.result.mapId, mutators: this.result.mutators }));
       this.makeButton(cx, cy + 104, 'MAIN MENU', 0x6fd0ff, '#04161f', () => this.go('ModeSelectScene'));
       return;
     }
@@ -151,7 +151,7 @@ export default class EndScene extends Phaser.Scene {
 
     this.makeButton(cx, cy + 46, 'REMATCH', accent, '#04140a', () => {
       this.registry.set('duelP1', null); this.registry.set('duelP2', null);
-      this.go('GameScene', { mode: 'duel', player: 1, mapId: this.result.mapId });
+      this.go('GameScene', { mode: 'duel', player: 1, mapId: this.result.mapId, mutators: this.result.mutators });
     });
     this.makeButton(cx, cy + 110, 'MAIN MENU', 0x6fd0ff, '#04161f', () => this.go('ModeSelectScene'));
   }

@@ -36,7 +36,7 @@ export default class Tower {
     // mutate the shared template. Methods read these, not this.stats.<x>.
     this.level = 1;
     this.maxLevel = 3;
-    this.range = stats.range;
+    this.range = stats.range != null ? stats.range * (scene.rangeMult || 1) : stats.range;
     this.damage = stats.damage;
     this.fireRateMs = stats.fireRateMs;
     this.splashRadius = stats.splashRadius;

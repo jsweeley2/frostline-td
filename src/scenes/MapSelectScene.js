@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, COLS, ROWS } from '../config.js';
 import { MAPS, MAP_ORDER } from '../maps/maps.js';
+import { MUTATORS } from '../config.js';
 
 // ---------------------------------------------------------------------------
 // MapSelectScene — pick a battlefield. Reached after choosing a mode; carries
@@ -15,6 +16,7 @@ export default class MapSelectScene extends Phaser.Scene {
 
   init(data) {
     this.modeData = data || { mode: 'solo' };
+    this.selectedMutators = {};
   }
 
   create() {
@@ -37,15 +39,47 @@ export default class MapSelectScene extends Phaser.Scene {
       .setOrigin(0.5);
     head.setShadow(0, 0, '#3fd0ff', 22, false, true);
 
-    const ys = [H * 0.32, H * 0.52, H * 0.72];
+    const ys = [H * 0.27, H * 0.43, H * 0.59];
     MAP_ORDER.forEach((id, i) => this.card(cx, ys[i], MAPS[id]));
 
+    // Optional mutator chips.
     this.add
-      .text(cx, H * 0.9, 'ESC  ·  back', {
+      .text(cx, H * 0.71, 'MUTATORS  (optional — click to toggle)', {
+        fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#8fb6d6', fontStyle: 'bold',
+      })
+      .setOrigin(0.5);
+    const cw = 168, gap = 12;
+    const totalW = MUTATORS.length * cw + (MUTATORS.length - 1) * gap;
+    let mx = cx - totalW / 2;
+    MUTATORS.forEach((mut) => { this.mutatorChip(mx, H * 0.77, cw, mut); mx += cw + gap; });
+
+    this.add
+      .text(cx, H * 0.92, 'ESC  ·  back', {
         fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#5f9fc0',
       })
       .setOrigin(0.5);
     this.input.keyboard?.on('keydown-ESC', () => this.scene.start('ModeSelectScene'));
+  }
+
+  mutatorChip(x, y, w, mut) {
+    const h = 50;
+    const bg = this.add
+      .rectangle(x, y, w, h, 0x0a1828, 0.95).setOrigin(0)
+      .setStrokeStyle(2, 0x3a4d63, 0.8).setInteractive({ useHandCursor: true });
+    const name = this.add.text(x + w / 2, y + 13, mut.name, {
+      fontFamily: 'system-ui, sans-serif', fontSize: '14px', color: '#dff4ff', fontStyle: 'bold',
+    }).setOrigin(0.5);
+    this.add.text(x + w / 2, y + 34, mut.desc, {
+      fontFamily: 'system-ui, sans-serif', fontSize: '9px', color: '#9fc0ff',
+      align: 'center', wordWrap: { width: w - 12 },
+    }).setOrigin(0.5);
+    bg.on('pointerdown', () => {
+      const on = !this.selectedMutators[mut.id];
+      this.selectedMutators[mut.id] = on;
+      bg.setStrokeStyle(2, on ? 0xffb24d : 0x3a4d63, on ? 1 : 0.8);
+      bg.setFillStyle(on ? 0x2a2415 : 0x0a1828, 0.95);
+      name.setColor(on ? '#ffd23f' : '#dff4ff');
+    });
   }
 
   card(cx, y, map) {
@@ -99,9 +133,10 @@ export default class MapSelectScene extends Phaser.Scene {
   }
 
   choose(mapId) {
+    const mutators = { ...this.selectedMutators };
     this.cameras.main.fadeOut(240, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () =>
-      this.scene.start('GameScene', { ...this.modeData, mapId })
+      this.scene.start('GameScene', { ...this.modeData, mapId, mutators })
     );
   }
 }

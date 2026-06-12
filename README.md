@@ -48,6 +48,7 @@ Following the staged build order from the spec:
 - [x] **Maps** — map picker; freeform maze + fixed-path lane maps (see below)
 - [x] **Feel pass** — synth sound effects (M mutes), floating credit/damage numbers, pause (P), how-to screen, tower tooltips
 - [x] **Meta** — tower targeting modes (First/Last/Closest/Strongest), boss waves every 10, saved Endless best-wave per map
+- [x] **Mutators** — optional run modifiers on the map screen (Double Time, Glass Cannon, Blizzard, Frugal)
 - [ ] Step 10 — Polish pass (balance tuning)
 
 ## Meta features

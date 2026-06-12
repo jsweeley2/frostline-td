@@ -52,6 +52,7 @@ export default class GameScene extends Phaser.Scene {
     this.mode = data.mode || 'solo';
     this.duelPlayer = data.player || 1;
     this.mapId = data.mapId || DEFAULT_MAP;
+    this.mutators = data.mutators || {};
     // Score Duel is always an Endless survival race.
     this.startEndless = this.mode === 'duel' ? true : !!data.endless;
   }
@@ -75,7 +76,10 @@ export default class GameScene extends Phaser.Scene {
     this.dmgMult = 1;
     this.rateMult = 1;
     this.creditMult = 1;
+    this.enemySpeedMult = 1;
+    this.rangeMult = 1;
     this.lastShopWave = 0; // last milestone wave that opened the shop
+    this.applyMutators();
 
     // Wave state. Waves may overlap: the next can be launched before the
     // previous is cleared, so we track total launched + total pending spawns
@@ -117,6 +121,15 @@ export default class GameScene extends Phaser.Scene {
 
     this.setupMode();
     this.refreshWaveUi();
+  }
+
+  // Optional run mutators (chosen on the map screen) tweak the global rules.
+  applyMutators() {
+    const m = this.mutators || {};
+    if (m.rush) this.enemySpeedMult = 1.5; // enemies move faster
+    if (m.frugal) this.creditMult *= 0.5; // half kill credits
+    if (m.glass) { this.dmgMult *= 1.5; this.baseHp = 50; } // +damage, frail shield
+    if (m.blizzard) this.rangeMult = 0.8; // shorter tower range
   }
 
   // Apply per-mode setup once the board + UI exist.
@@ -385,14 +398,15 @@ export default class GameScene extends Phaser.Scene {
     if (win) sfx.win(); else sfx.lose();
 
     const mapId = this.mapId;
+    const mutators = this.mutators;
     if (this.mode === 'duel') {
       // Record this player's survival score, then advance the duel.
       const score = { wave: this.currentWave, kills: this.kills };
-      this.scene.launch('EndScene', { duel: true, player: this.duelPlayer, score, mapId });
+      this.scene.launch('EndScene', { duel: true, player: this.duelPlayer, score, mapId, mutators });
       return;
     }
     if (this.mode === 'avd') {
-      this.scene.launch('EndScene', { avd: true, defenderWon: win, wave: this.currentWave, kills: this.kills, mapId });
+      this.scene.launch('EndScene', { avd: true, defenderWon: win, wave: this.currentWave, kills: this.kills, mapId, mutators });
       return;
     }
     // Track the Endless best wave per map in localStorage.
@@ -411,6 +425,7 @@ export default class GameScene extends Phaser.Scene {
       endless: this.endless,
       best,
       mapId,
+      mutators,
     });
   }
 

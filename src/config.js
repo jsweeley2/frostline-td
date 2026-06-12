@@ -31,6 +31,14 @@ export const SPEED_STEPS = [1, 2, 3];
 // Game-time delay before an auto-started wave begins once the field is clear.
 export const AUTO_START_DELAY_MS = 2000;
 
+// Optional run mutators, toggled on the map screen for extra challenge/variety.
+export const MUTATORS = [
+  { id: 'rush', name: 'Double Time', desc: 'Enemies move 50% faster' },
+  { id: 'glass', name: 'Glass Cannon', desc: '+50% tower damage, but shield starts at 50' },
+  { id: 'blizzard', name: 'Blizzard', desc: 'Tower range reduced 20%' },
+  { id: 'frugal', name: 'Frugal', desc: 'Half credits from kills' },
+];
+
 // Kill Shop: every 5 cleared waves (solo), spend kills on these global perks.
 // They stack, so buying the same one again keeps boosting it.
 export const PERKS = [
