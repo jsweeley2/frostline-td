@@ -170,13 +170,13 @@ export default class GameScene extends Phaser.Scene {
 
     // P2 build cursor (magenta) drawn over the hovered cell.
     this.p2Cursor = this.add.rectangle(0, 0, TILE, TILE, 0xff5db0, 0.18).setDepth(6).setStrokeStyle(3, 0xff5db0, 0.95);
-    // P2 control hint in the bottom bar.
+    // P2 control hint: a single line on the LEFT of the bottom-bar hint strip,
+    // above the tower buttons so it never overlaps the palette.
     this.p2Label = this.add
-      .text(GAME_WIDTH - 14, GRID_Y + GRID_H + 6, '', {
-        fontFamily: '"Courier New", monospace', fontSize: '12px', color: '#ff9ad0',
-        align: 'right', lineSpacing: 3, fontStyle: 'bold',
+      .text(14, GRID_Y + GRID_H + 7, '', {
+        fontFamily: '"Courier New", monospace', fontSize: '12px', color: '#ff9ad0', fontStyle: 'bold',
       })
-      .setOrigin(1, 0).setDepth(11);
+      .setOrigin(0, 0).setDepth(11);
 
     const arrow = (key, dc, dr) => this.input.keyboard?.on(`keydown-${key}`, () => this.moveP2(dc, dr));
     arrow('LEFT', -1, 0); arrow('RIGHT', 1, 0); arrow('UP', 0, -1); arrow('DOWN', 0, 1);
@@ -220,8 +220,8 @@ export default class GameScene extends Phaser.Scene {
     const { x, y } = cellCenter(this.p2.col, this.p2.row);
     const ok = this.p2.tool ? this.canPlace(this.p2.col, this.p2.row, this.p2.tool) : true;
     this.p2Cursor.setPosition(x, y).setStrokeStyle(3, ok ? 0xff5db0 : 0xe05a47, 0.95);
-    const tool = this.p2.tool ? this.p2.tool.name : '(none)';
-    this.p2Label.setText(`P2  ·  ${tool}\nArrows move · 1-5 pick · Enter place · Bksp sell`);
+    const tool = this.p2.tool ? this.p2.tool.name : 'none';
+    this.p2Label.setText(`P2 [${tool}]   arrows move · 1-5 pick · Enter place · Bksp sell`);
   }
 
   // ---- pathfinding -------------------------------------------------------
