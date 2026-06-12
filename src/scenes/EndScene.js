@@ -86,7 +86,7 @@ export default class EndScene extends Phaser.Scene {
         .setOrigin(0.5);
     }
 
-    const replay = { mode: 'solo', endless: this.result.endless, mapId: this.result.mapId, mutators: this.result.mutators };
+    const replay = { mode: this.result.mode || 'solo', endless: this.result.endless, mapId: this.result.mapId, mutators: this.result.mutators };
     this.makeButton(cx, cy + 36, 'PLAY AGAIN', accent, '#04140a', () => this.go('GameScene', replay));
     this.makeButton(cx, cy + 100, 'MAIN MENU', 0x6fd0ff, '#04161f', () => this.go('ModeSelectScene'));
     this.input.keyboard?.on('keydown-ENTER', () => this.go('GameScene', replay));

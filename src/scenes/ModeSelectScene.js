@@ -42,17 +42,19 @@ export default class ModeSelectScene extends Phaser.Scene {
     head.setShadow(0, 0, '#3fd0ff', 22, false, true);
 
     // Mode cards.
-    this.card(cx, H * 0.30, 'SOLO DEFENSE', 'Hold the line alone across 20 waves (or Endless).',
+    this.card(cx, H * 0.255, 'SOLO DEFENSE', 'Hold the line alone across 20 waves (or Endless).',
       0x6fd0ff, () => this.start({ mode: 'solo' }));
-    this.card(cx, H * 0.445, 'ATTACKER vs DEFENDER', '2 players: one builds towers, one sends the waves (keys 1-5).',
+    this.card(cx, H * 0.38, 'CO-OP  (2P)', 'Defend together: P1 mouse, P2 arrow keys. Shared credits.',
+      0x49e6ea, () => this.start({ mode: 'coop' }));
+    this.card(cx, H * 0.505, 'ATTACKER vs DEFENDER', '2 players: one builds towers, one sends the waves (keys 1-5).',
       0xe05a47, () => this.start({ mode: 'avd' }));
-    this.card(cx, H * 0.59, 'SCORE DUEL  (2P)', 'Take turns surviving Endless. Highest wave reached wins.',
+    this.card(cx, H * 0.63, 'SCORE DUEL  (2P)', 'Take turns surviving Endless. Highest wave reached wins.',
       0x39c06a, () => this.startDuel());
-    this.card(cx, H * 0.735, 'DAILY CHALLENGE', "Today's set map + mutators, same for everyone. Endless.",
+    this.card(cx, H * 0.755, 'DAILY CHALLENGE', "Today's set map + mutators, same for everyone. Endless.",
       0xffd23f, () => this.startDaily());
 
     const howto = this.add
-      .text(cx, H * 0.85, 'HOW TO PLAY', {
+      .text(cx, H * 0.86, 'HOW TO PLAY', {
         fontFamily: 'system-ui, sans-serif', fontSize: '16px', color: '#6fd0ff', fontStyle: 'bold',
       })
       .setOrigin(0.5).setInteractive({ useHandCursor: true });

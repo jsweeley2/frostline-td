@@ -50,8 +50,15 @@ Following the staged build order from the spec:
 - [x] **Meta** — tower targeting modes (First/Last/Closest/Strongest), boss waves every 10, saved Endless best-wave per map
 - [x] **Mutators** — optional run modifiers on the map screen (Double Time, Glass Cannon, Blizzard, Frugal)
 - [x] **Daily Challenge** — a deterministic map + mutator combo from the date, same for everyone that day (Endless)
-- [ ] Co-op + Puzzle modes — remaining (need a 2nd-player control scheme / level design)
+- [x] **Co-op (2P)** — two players defend the same base; P1 mouse, P2 keyboard cursor, shared credits
+- [ ] Puzzle mode — remaining (needs hand-designed challenge levels)
 - [ ] Step 10 — Polish pass (balance tuning)
+
+## Co-op controls
+
+Both players defend the same field and share one credit pool.
+- **Player 1:** mouse (build / upgrade / sell as usual).
+- **Player 2:** **arrow keys** move a pink cursor, **1-5** pick a tower, **Enter/Space** places, **Backspace** sells the tower under the cursor.
 
 ## Meta features
 

@@ -156,8 +156,72 @@ export default class GameScene extends Phaser.Scene {
       [K.ONE, K.TWO, K.THREE, K.FOUR, K.FIVE].forEach((code, i) => {
         this.input.keyboard?.on(`keydown-${['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'][i]}`, () => this.sendAttackUnit(i));
       });
+    } else if (this.mode === 'coop') {
+      // Co-op: keep the normal solo UI (P1 mouse) and add a P2 keyboard builder.
+      this.setupCoop();
     }
     this.updateHud();
+  }
+
+  // ---- Co-op (Player 2 keyboard builder) ---------------------------------
+
+  setupCoop() {
+    this.p2 = { col: Math.floor(COLS / 2), row: Math.floor(ROWS / 2), tool: null };
+
+    // P2 build cursor (magenta) drawn over the hovered cell.
+    this.p2Cursor = this.add.rectangle(0, 0, TILE, TILE, 0xff5db0, 0.18).setDepth(6).setStrokeStyle(3, 0xff5db0, 0.95);
+    // P2 control hint in the bottom bar.
+    this.p2Label = this.add
+      .text(GAME_WIDTH - 14, GRID_Y + GRID_H + 6, '', {
+        fontFamily: '"Courier New", monospace', fontSize: '12px', color: '#ff9ad0',
+        align: 'right', lineSpacing: 3, fontStyle: 'bold',
+      })
+      .setOrigin(1, 0).setDepth(11);
+
+    const arrow = (key, dc, dr) => this.input.keyboard?.on(`keydown-${key}`, () => this.moveP2(dc, dr));
+    arrow('LEFT', -1, 0); arrow('RIGHT', 1, 0); arrow('UP', 0, -1); arrow('DOWN', 0, 1);
+    const nums = ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE'];
+    nums.forEach((n, i) => this.input.keyboard?.on(`keydown-${n}`, () => this.p2Pick(i)));
+    this.input.keyboard?.on('keydown-ENTER', () => this.p2Place());
+    this.input.keyboard?.on('keydown-SPACE', () => this.p2Place());
+    this.input.keyboard?.on('keydown-BACKSPACE', () => this.p2Sell());
+
+    this.updateP2();
+  }
+
+  moveP2(dc, dr) {
+    this.p2.col = Phaser.Math.Clamp(this.p2.col + dc, 0, COLS - 1);
+    this.p2.row = Phaser.Math.Clamp(this.p2.row + dr, 0, ROWS - 1);
+    this.updateP2();
+  }
+
+  p2Pick(i) {
+    const stats = TOWERS[TOWER_ORDER[i]];
+    this.p2.tool = this.p2.tool === stats ? null : stats;
+    this.updateP2();
+  }
+
+  p2Place() {
+    if (!this.p2 || !this.p2.tool) return;
+    if (this.canPlace(this.p2.col, this.p2.row, this.p2.tool)) {
+      this.placeTower(this.p2.col, this.p2.row, this.p2.tool);
+      this.updateP2();
+    }
+  }
+
+  p2Sell() {
+    if (!this.p2) return;
+    const t = this.towerAt(this.p2.col, this.p2.row);
+    if (t) this.sellTower(t);
+  }
+
+  updateP2() {
+    if (!this.p2) return;
+    const { x, y } = cellCenter(this.p2.col, this.p2.row);
+    const ok = this.p2.tool ? this.canPlace(this.p2.col, this.p2.row, this.p2.tool) : true;
+    this.p2Cursor.setPosition(x, y).setStrokeStyle(3, ok ? 0xff5db0 : 0xe05a47, 0.95);
+    const tool = this.p2.tool ? this.p2.tool.name : '(none)';
+    this.p2Label.setText(`P2  ·  ${tool}\nArrows move · 1-5 pick · Enter place · Bksp sell`);
   }
 
   // ---- pathfinding -------------------------------------------------------
@@ -361,10 +425,10 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
 
-    // Kill Shop: every 5th cleared wave (solo only), pause and open the shop
+    // Kill Shop: every 5th cleared wave (solo & co-op), pause and open the shop
     // before the next wave can start.
     if (
-      this.mode === 'solo' &&
+      (this.mode === 'solo' || this.mode === 'coop') &&
       !this.waveInProgress &&
       this.currentWave > 0 &&
       this.currentWave % 5 === 0 &&
@@ -426,6 +490,7 @@ export default class GameScene extends Phaser.Scene {
       best,
       mapId,
       mutators,
+      mode: this.mode, // solo or coop
     });
   }
 
@@ -1076,7 +1141,7 @@ export default class GameScene extends Phaser.Scene {
         ? `Wave ${this.currentWave} (Endless)`
         : `Wave ${this.currentWave}/${WAVES.length}`;
     }
-    const killsPart = this.mode === 'solo' ? `     Kills ${this.killPoints}` : '';
+    const killsPart = (this.mode === 'solo' || this.mode === 'coop') ? `     Kills ${this.killPoints}` : '';
     this.hudText.setText(`${label}     Credits ${this.credits}     Shield ${this.baseHp}${killsPart}`);
     this.refreshToolButtons();
     // Keep the upgrade panel's affordability current as credits change.
@@ -1104,8 +1169,8 @@ export default class GameScene extends Phaser.Scene {
   refreshWaveUi() {
     this.updateHud();
 
-    // Only Solo uses the manual Next-Wave button; 2P modes hide it.
-    if (this.mode !== 'solo') {
+    // Solo and Co-op use the manual wave controls; AvD and Duel hide them.
+    if (this.mode === 'avd' || this.mode === 'duel') {
       this.nextWaveBtn.bg.setVisible(false);
       this.nextWaveBtn.label.setVisible(false);
       return;
