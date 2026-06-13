@@ -129,14 +129,13 @@ export default class TitleScene extends Phaser.Scene {
   buildQuote(W, H) {
     const qy = H * 0.5;
     const quote = this.add
-      .text(W / 2, qy,
-        '"They told us the long winter would take everything.\nWe answered with light, and held the line."', {
-        fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '21px',
+      .text(W / 2, qy, '"Unicorns are the best."', {
+        fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '26px',
         color: '#bfe6ff', fontStyle: 'italic', align: 'center', lineSpacing: 8,
       })
       .setOrigin(0.5).setDepth(20);
     const attr = this.add
-      .text(W / 2, qy + 56, '— FROSTLINE COMMAND, FIRST WINTER', {
+      .text(W / 2, qy + 40, '', {
         fontFamily: 'system-ui, sans-serif', fontSize: '13px', color: '#5f9fc0', fontStyle: 'bold',
       })
       .setOrigin(0.5).setDepth(20);
