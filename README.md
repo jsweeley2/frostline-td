@@ -1,140 +1,91 @@
-# Frostline TD
+# Stunt Driver 🏎️
 
-A browser-based, single-player **maze-style tower defense** game set on a sci-fi
-ice planet. Defend the shield generator from invading forces. Built with
-[Phaser 3](https://phaser.io/) and [Vite](https://vitejs.dev/).
+A 3D stunt driving game. Drive a race car around, hit ramps, and get big air.
+Built with Vite + vanilla JavaScript, Three.js (the pictures) and cannon-es (the physics).
 
-## Running locally
+This is **Phase 1**: one car, one flat world with ramps, and three cameras. The
+whole point of Phase 1 is that the car **feels good to drive**.
 
-```bash
-npm install
-npm run dev
-```
-
-Then open the URL Vite prints (default http://localhost:5173).
-
-## Build
+## Run it
 
 ```bash
-npm run build      # outputs to dist/
-npm run preview    # serve the production build locally
+npm install      # download Three.js, cannon-es and Vite (only needed once)
+npm run dev      # start the game, then open the link it prints
 ```
 
-## Deployment
+To make the finished version for the web:
 
-Hosted on Vercel, auto-deploying from the `main` branch.
+```bash
+npm run build    # puts the game in the dist/ folder
+```
 
-## Build status
+## Controls
 
-Following the staged build order from the spec:
+| Key | What it does |
+| --- | --- |
+| **W / ↑** | Drive forward (in the air: front-flip) |
+| **S / ↓** | Reverse (in the air: back-flip) |
+| **A / ←** | Steer left (in the air: spin left) |
+| **D / →** | Steer right (in the air: spin right) |
+| **Space** | Handbrake — locks the back wheels for slides |
+| **C** | Change camera (chase → front → cockpit) |
+| **R** | Respawn (flip the car back upright at the start) |
+| **Reset button** | Same as R, with the mouse |
 
-- [x] **Step 1** — Pipeline check: Phaser + Vite running locally and on Vercel (colored square)
-- [x] **Step 2** — Grid + shield generator
-- [x] **Step 3** — Enemy spawning + A* pathfinding (Light Scouts walk to base, damage it)
-- [x] **Step 4** — Tower placement (Sniper Towers, block validation, live rerouting)
-- [x] **Step 5** — Tower shooting + enemy death (targeting, tracers, range ring, kills)
-- [x] **Step 6** — Heavy Walker enemy + Tripwire Hook trap (type interactions)
-- [x] **Step 7** — Waves (20 hand-tuned waves + "Start Next Wave" button)
-- [x] **Step 8** — Economy (starting credits, kill rewards, tower costs enforced)
-- [x] **Controls** — speed toggle (1x/2x/3x), auto-start, rush-next-wave (overlapping waves)
-- [x] **Step 9** — Win / lose conditions (Game Over + Victory screens, Play Again)
-- [x] **Expansion** — 3 new enemies + 3 new towers + UI layout refactor (see below)
-- [x] **Endless mode** — Campaign/Endless toggle; infinite procedurally-scaled waves
-- [x] **Art pass** — original sprite art (baked in code in `src/art.js`), combat effects, animations
-- [x] **Upgrades + border** — click a tower to upgrade it (3 levels); decorative field frame
-- [x] **Title screen** — animated sci-fi title (aurora, starfield, ice planet) with a quote
-- [x] **2-player modes** — mode-select menu: Attacker vs Defender + Score Duel (see below)
-- [x] **Kill Shop** — every 5 cleared waves (solo), spend kills on stacking global perks
-- [x] **Maps** — map picker; freeform maze + fixed-path lane maps (see below)
-- [x] **Feel pass** — synth sound effects (M mutes), floating credit/damage numbers, pause (P), how-to screen, tower tooltips
-- [x] **Meta** — tower targeting modes (First/Last/Closest/Strongest), boss waves every 10, saved Endless best-wave per map
-- [x] **Mutators** — optional run modifiers on the map screen (Double Time, Glass Cannon, Blizzard, Frugal)
-- [x] **Daily Challenge** — a deterministic map + mutator combo from the date, same for everyone that day (Endless)
-- [x] **Co-op (2P)** — two players defend the same base; P1 mouse, P2 keyboard cursor, shared credits
-- [ ] Puzzle mode — remaining (needs hand-designed challenge levels)
-- [ ] Step 10 — Polish pass (balance tuning)
+## The files, and what each one does
 
-## Co-op controls
+Everything lives in `src/`. Each file does one job.
 
-Both players defend the same field and share one credit pool.
-- **Player 1:** mouse (build / upgrade / sell as usual).
-- **Player 2:** **arrow keys** move a pink cursor, **1-5** pick a tower, **Enter/Space** places, **Backspace** sells the tower under the cursor.
+| File | Job |
+| --- | --- |
+| `main.js` | **The heart.** Starts everything, then runs the game loop ~60 times a second. Read this first. |
+| `world.js` | The 3D scene you see: sky, sun, shadows, ground, and the ramps. |
+| `physics.js` | The invisible physics world (gravity + the ground the wheels feel). |
+| `car.js` | Builds the car and makes it drive (raycast wheel suspension). |
+| `cars.js` | **Every car is ONE entry here** — mass, power, grip, springs, body shape. |
+| `pieces.js` | **Every track piece is ONE entry here** — shape, collision, and how it snaps. |
+| `cameras.js` | The three camera modes and switching between them. |
+| `dashboard.js` | The cockpit steering wheel (it really turns) and dashboard. |
+| `controls.js` | Reads the keyboard. |
+| `hud.js` | The on-screen speed, camera name and Reset button. |
 
-## Meta features
+### Want to change how the car feels?
 
-- **Targeting modes:** select a placed shooter tower and cycle its target
-  priority (First / Last / Closest / Strongest) in the panel.
-- **Boss waves:** every 10th wave sends a giant Juggernaut boss (lots of HP, big
-  credit reward) with a warning banner.
-- **High scores:** Endless saves your best wave reached per map (localStorage);
-  the end screen shows it and flags a new best.
+Open **`cars.js`** and change one number at a time. The comments tell you what
+each number does. You never need to touch `car.js` to do this.
 
-## Maps
+### Want to add a new ramp or track piece later?
 
-After picking a mode you choose a map:
-- **Open Snowfield** (maze) — freeform; towers act as walls and the route is
-  found with A* (the original mode).
-- **Switchback Pass / The Gauntlet** (fixed path) — classic lane TD: enemies
-  follow a preset winding lane and towers are placed beside it (they don't block).
+Add one entry to **`pieces.js`**. The renderer, the physics and (in Phase 2) the
+track builder all read from that one file.
 
-## Kill Shop
+## Things we learned the hard way (notes for later)
 
-In Solo, every 5th wave you clear pauses the game and opens a "Resupply" shop.
-Your **kills** are the currency; spend them on stacking global perks: +shield HP,
-+12% tower damage, +10% fire rate, +25% credit bounty, or instant credits.
-Hit Continue to resume. Kill count shows in the HUD.
+A few tricky bugs we hit while building Phase 1, written down so we don't repeat them:
 
-## Modes (mode-select menu after the title)
+- **The car must never "sleep".** cannon-es puts still things to sleep to save
+  work, but a sleeping car ignores the engine. See `allowSleep = false` in `car.js`.
+- **The ground is a giant box, not a flat plane.** The wheel-rays reliably see a
+  box; they can miss an infinite plane and the car falls through. See `physics.js`.
+- **After moving/rotating a physics block you must set `aabbNeedsUpdate = true`**,
+  or the engine still thinks it's back at the start and the wheel-rays can't find
+  it — so the car drives straight through ramps. See `world.js`. (This one took
+  a while!)
+- **Ramps are a smooth curve, not a hard wedge.** A car at speed crashes into a
+  hard-angled ramp. Ours is a parabola made of short slabs, so the car slides on
+  smoothly and flies off the top.
 
-- **Solo Defense** — the normal 1-player game (Campaign or Endless).
-- **Attacker vs Defender (2P)** — one player builds towers with the mouse; the
-  other player presses number keys **1-5** to spend regenerating *menace* and
-  send enemies (Runner / Scout / Disruptor / Walker / Juggernaut). The defender
-  wins if the shield survives the countdown; the attacker wins if it falls.
-- **Score Duel (2P)** — players take turns surviving Endless. When the shield
-  falls, the other player takes over; the higher wave reached (kills as
-  tiebreak) wins.
+## Coming in later phases (not built yet)
 
-## Upgrading towers
+Loop-de-loops, corkscrews, boosters, a track builder, more cars (monster truck!),
+level progression, lap times and sound.
 
-Click a placed tower (when no tower button is selected) to open its panel, then
-press **U** or click **Upgrade** to spend credits leveling it up (max Lv 3).
-Each level boosts the tower's key stats (damage/range/fire rate, splash, chains,
-slow strength, etc.). Gold pips above a tower show its level. Press **S** or
-click **Sell** to remove a tower and refund part of what you spent on it.
+**The loop-de-loop plan:** a normal car falls off the top of a loop because "down"
+always points at the ground. The fix is to gently pull the car toward the road it's
+driving on, so "down" becomes "the road". The wheels already report the road's
+direction, so this plugs in later.
 
-## Economy rules
+---
 
-- Each tower type has a **build cap** (e.g. 14 Snipers, 8 Frost), shown on its
-  palette button as `count/max`.
-- Tower prices **rise** as you build more of a type (x1.15 per existing tower of
-  that type), so spamming one tower gets pricier; selling brings the price back
-  down.
-- **Selling** refunds 60% of everything spent on a tower (purchase + upgrades).
-
-## Modes
-
-- **Campaign** — the 20 hand-built waves; survive all of them to win.
-- **Endless** — waves never stop. After wave 20 they're generated on the fly with
-  growing counts, tighter spawns, and scaling enemy HP. No victory: see how far
-  you can get. Toggle with the **Mode** button before/while playing.
-
-## Enemies
-
-| Enemy | Traits | Counter |
-|-------|--------|---------|
-| Light Scout | fast, fragile | Sniper / Tesla |
-| Runner | extremely fast, paper HP, swarms | Frost + AoE / Tesla |
-| Heavy Walker | slow, high HP, trips hooks | Tripwire / Plasma |
-| Disruptor | EMP that disables a nearby tower for a few seconds | kill it fast (Sniper/Plasma) |
-| Juggernaut | boss: huge HP, devastating to the base, trips hooks | Tripwire chains + Frost + focus fire |
-
-## Towers
-
-| Tower | Cost | Ability |
-|-------|------|---------|
-| Sniper Tower | 50 | long range, high single-target, slow reload |
-| Tripwire Hook | 20 | ground trap: big hit + freeze on heavy units, ignores fast ones |
-| Frost Tower | 40 | slows + lightly damages every enemy in range (force multiplier) |
-| Plasma Mortar | 70 | area-of-effect splash damage (anti-swarm) |
-| Tesla Coil | 85 | fast chain lightning that arcs between several enemies |
+_The previous game that used to live here (Frostline TD, a tower-defense game) has
+been moved into the `frostline-td-old/` folder — nothing was deleted._

@@ -3,26 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Frostline TD</title>
+    <title>Stunt Driver</title>
     <style>
+      /* Fill the whole browser window with the game, no scrollbars. */
       html, body {
         margin: 0;
         padding: 0;
-        background: #0b1320;
-        color: #e6f0ff;
-        font-family: system-ui, sans-serif;
         overflow: hidden;
+        background: #87b7e0;
+        font-family: system-ui, sans-serif;
       }
+      /* The 3D game draws onto this canvas. It fills the screen. */
       #game {
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        display: block;
+        width: 100vw;
         height: 100vh;
       }
     </style>
   </head>
   <body>
-    <div id="game"></div>
+    <!-- Three.js draws the 3D world onto this canvas. -->
+    <canvas id="game"></canvas>
+    <!-- main.js is the heart of the game. It starts everything. -->
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
