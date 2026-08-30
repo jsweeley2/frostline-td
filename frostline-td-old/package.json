@@ -1,7 +1,7 @@
 {
-  "name": "stunt-driver",
+  "name": "frostline-td",
   "version": "0.1.0",
-  "description": "Stunt Driver: a 3D stunt driving game. Phase 1 = one car that feels amazing to drive.",
+  "description": "Frostline TD: a sci-fi ice-planet maze tower defense game",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,8 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "three": "^0.169.0",
-    "cannon-es": "^0.20.0"
+    "phaser": "^3.90.0"
   },
   "devDependencies": {
     "vite": "^6.0.0"
