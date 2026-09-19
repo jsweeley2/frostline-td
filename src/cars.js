@@ -12,9 +12,12 @@
 // ---------------------------------------------------------------------------
 
 export const CARS = {
-  // The one car we have in Phase 1: a race car. Fast and a little slippery.
+  // Fast and a little slippery. The all-rounder that likes big jumps.
   raceCar: {
     name: 'Race Car',
+    // Little 1-5 bars shown on the "pick your car" screen. Just for looks.
+    stats: { speed: 5, grip: 3, tough: 2 },
+    blurb: 'Fast and zippy, slides in corners.',
 
     // --- How the physics engine treats the car ---
     mass: 400, // heavier = harder to push around, lands with more thud, harder to flip
@@ -77,6 +80,77 @@ export const CARS = {
     frontZ: -1.6, // front wheels, JUST past the nose (body half-length is 1.5)
     backZ: 1.6, // back wheels, JUST past the tail
     wheelY: -0.25, // how far down the wheels hang from the chassis middle
+  },
+
+  // Balanced and easy to drive. A good "just right" car.
+  normalCar: {
+    name: 'Normal Car',
+    stats: { speed: 3, grip: 4, tough: 3 },
+    blurb: 'Steady and grippy. Easy to control.',
+
+    mass: 550,
+    engineForce: 950,
+    maxSteer: 0.5,
+    brakeForce: 25,
+    handbrakeForce: 100,
+    suspension: {
+      stiffness: 55,
+      restLength: 0.5,
+      travel: 0.4,
+      compression: 4.4,
+      relaxation: 2.3,
+      maxForce: 120000,
+    },
+    frictionSlip: 4.5, // more grip than the race car = less sliding
+    rollInfluence: 0.12,
+    body: {
+      chassis: { width: 1.9, height: 0.6, length: 3.2 },
+      cabin: { width: 1.6, height: 0.55, length: 1.8, offsetZ: -0.1 },
+      collision: { width: 1.7, height: 0.45, length: 2.0, offsetY: 0.12 },
+      color: 0xffcc33, // sunny yellow
+      cabinColor: 0x223344,
+    },
+    wheel: { radius: 0.48, width: 0.32, color: 0x111111 },
+    axleWidth: 1.0,
+    frontZ: -1.7,
+    backZ: 1.7,
+    wheelY: -0.28,
+  },
+
+  // Big, heavy and grippy, with fat wheels and soft springs so it can land
+  // enormous jumps without flipping. Slower to get going.
+  monsterTruck: {
+    name: 'Monster Truck',
+    stats: { speed: 2, grip: 5, tough: 5 },
+    blurb: 'Huge and tough. Grips hard, lands big.',
+
+    mass: 950,
+    engineForce: 1900, // lots of push, but it is heavy so it still feels slow
+    maxSteer: 0.55,
+    brakeForce: 45,
+    handbrakeForce: 160,
+    suspension: {
+      stiffness: 45, // softer springs soak up giant landings
+      restLength: 0.75, // tall stance = big ground clearance
+      travel: 0.7, // long travel so it bounces instead of slamming
+      compression: 4.0,
+      relaxation: 2.6,
+      maxForce: 300000, // strong enough to hold up all that weight on a landing
+    },
+    frictionSlip: 5.5, // monster-truck tyres grip a lot
+    rollInfluence: 0.1, // low so the tall body doesn't tip over
+    body: {
+      chassis: { width: 2.3, height: 0.8, length: 3.4 },
+      cabin: { width: 1.9, height: 0.7, length: 2.0, offsetZ: -0.1 },
+      collision: { width: 2.0, height: 0.55, length: 2.2, offsetY: 0.2 },
+      color: 0x33aa55, // monster green
+      cabinColor: 0x113322,
+    },
+    wheel: { radius: 0.8, width: 0.55, color: 0x0a0a0a }, // big fat tyres
+    axleWidth: 1.25,
+    frontZ: -1.75,
+    backZ: 1.75,
+    wheelY: -0.4,
   },
 };
 

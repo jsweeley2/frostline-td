@@ -17,6 +17,15 @@ const MODES = ['chase', 'front', 'cockpit'];
 export function createCameras(camera, car, dashboard) {
   let modeIndex = 0;
 
+  // Point the cameras at a NEW car and its dashboard. Called when you swap cars
+  // in the garage, so the camera follows the car you just picked.
+  function setTarget(newCar, newDashboard) {
+    car = newCar;
+    dashboard = newDashboard;
+    firstFrame = true; // snap cleanly to the new car instead of sliding across
+    dashboard.setVisible(getMode() === 'cockpit');
+  }
+
   // A remembered, smoothed position so the chase cam can lag behind instead of
   // being glued to the car.
   const smoothedPos = new THREE.Vector3();
@@ -112,5 +121,5 @@ export function createCameras(camera, car, dashboard) {
   // Set the very first frame up.
   dashboard.setVisible(false);
 
-  return { next, update, getMode };
+  return { next, update, getMode, setTarget };
 }

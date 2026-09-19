@@ -16,6 +16,7 @@ import * as THREE from 'three';
 import { createWorld, buildRamps } from './world.js';
 import { createPhysicsWorld, PHYSICS_STEP } from './physics.js';
 import { createCar } from './car.js';
+import { CARS } from './cars.js';
 import { createDashboard } from './dashboard.js';
 import { createCameras } from './cameras.js';
 import { createControls } from './controls.js';
@@ -32,18 +33,57 @@ const { world } = createPhysicsWorld();
 // Build the ramps into BOTH worlds from the pieces.js recipe.
 buildRamps(scene, world);
 
-// The car. It lives in both worlds too. We load the "raceCar" entry from cars.js.
-const car = createCar(scene, world, 'raceCar');
+// The list of cars for the garage picker, built straight from cars.js. Add a
+// car there and it shows up here automatically - no code to change.
+const carIds = Object.keys(CARS);
+const carList = carIds.map((id) => ({
+  id,
+  name: CARS[id].name,
+  color: CARS[id].body.color,
+  stats: CARS[id].stats,
+  blurb: CARS[id].blurb,
+}));
 
-// The cockpit steering wheel + dashboard, and the three cameras.
-const dashboard = createDashboard(car);
+// The car we're driving right now. These are `let` (not `const`) because the
+// garage swaps them out for a different car when you pick one.
+let currentCarId = 'raceCar';
+let car = createCar(scene, world, currentCarId);
+let dashboard = createDashboard(car);
+
+// The three cameras (they follow whichever car is current).
 const cameras = createCameras(camera, car, dashboard);
 
-// The HUD (speed, camera name, reset button) and the keyboard.
-const hud = createHud({ onReset: () => car.respawn() });
+// THE GARAGE: swap to a different car. We throw away the old car and build the
+// new one, then point the cameras and dashboard at it. Picking the car you're
+// already in just sends you back to the start.
+function spawnCar(id) {
+  if (!CARS[id]) return;
+  if (id === currentCarId) {
+    car.respawn();
+    return;
+  }
+  car.destroy(); // remove the old car from both worlds (this also removes its dashboard)
+  currentCarId = id;
+  car = createCar(scene, world, id);
+  dashboard = createDashboard(car);
+  cameras.setTarget(car, dashboard); // cameras now follow the new car
+  hud.setActiveCar(id); // highlight the chosen car in the picker
+}
+
+// The HUD (speed, camera name, reset button, and the car picker) and the keyboard.
+const hud = createHud({
+  onReset: () => car.respawn(),
+  cars: carList,
+  currentCar: currentCarId,
+  onSelectCar: spawnCar,
+});
 const controls = createControls({
   onCamera: () => cameras.next(),
   onRespawn: () => car.respawn(),
+  // Number keys 1, 2, 3... are shortcuts for picking a car.
+  onSelectCarIndex: (n) => {
+    if (carIds[n - 1]) spawnCar(carIds[n - 1]);
+  },
 });
 
 // A clock so we know how much time passed since the last frame.

@@ -11,9 +11,10 @@
 //   Space           - handbrake (slides!)
 //   C               - change camera
 //   R               - respawn (flip the car back upright at the start)
+//   1 / 2 / 3 ...    - pick a car in the garage
 // ---------------------------------------------------------------------------
 
-export function createControls({ onCamera, onRespawn }) {
+export function createControls({ onCamera, onRespawn, onSelectCarIndex }) {
   // Which keys are held right now.
   const keys = {};
 
@@ -24,6 +25,10 @@ export function createControls({ onCamera, onRespawn }) {
     // here on the key-down moment.
     if (e.code === 'KeyC') onCamera();
     if (e.code === 'KeyR') onRespawn();
+
+    // Number keys 1-9 pick a car (Digit1 on the top row, or the numpad).
+    const digit = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
+    if (digit && onSelectCarIndex) onSelectCarIndex(Number(digit[1]));
 
     // Stop the arrow keys and space from scrolling the page.
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {

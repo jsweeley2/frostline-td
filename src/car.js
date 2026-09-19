@@ -236,6 +236,14 @@ export function createCar(scene, world, carId) {
     chassisBody.angularVelocity.set(0, 0, 0);
   }
 
+  // Take this car out of both worlds, so we can swap in a different one.
+  // Used when you pick a new car in the garage.
+  function destroy() {
+    vehicle.removeFromWorld(world); // stops the wheel-raycasting each step
+    world.removeBody(chassisBody); // remove the body from the physics world
+    scene.remove(carGroup); // remove all the pictures
+  }
+
   // Everything the rest of the game needs to talk to the car.
   return {
     chassisBody,
@@ -243,6 +251,7 @@ export function createCar(scene, world, carId) {
     controls,
     update,
     respawn,
+    destroy,
     getSpeedKmh,
     isGrounded,
     get steer() {
