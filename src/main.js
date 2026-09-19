@@ -25,6 +25,7 @@ import { createCameras } from './cameras.js';
 import { createControls } from './controls.js';
 import { createHud } from './hud.js';
 import { createBuilder, loadCustomTrack } from './builder.js';
+import { createCarMaker, loadCustomCarOpts, makeCarSpec } from './carmaker.js';
 
 // How close the car has to get to a star to collect it.
 const COLLECT_RADIUS = 3;
@@ -37,6 +38,11 @@ const { world } = createPhysicsWorld();
 
 // What levels you've beaten (loaded from the browser so it's remembered).
 const progress = loadProgress();
+
+// If you've already designed your own car, load that design over the default one
+// BEFORE we build the garage list, so your car shows up the way you made it.
+const savedCarOpts = loadCustomCarOpts();
+if (savedCarOpts) CARS.myCar = makeCarSpec(savedCarOpts);
 
 // The list of cars for the garage picker, built straight from cars.js.
 const carIds = Object.keys(CARS);
@@ -183,6 +189,23 @@ const hud = createHud({
   onReplayLevel: () => (isCustomLevel ? playCustom() : loadLevel(currentLevelIndex)),
   onBuild: () => enterBuild(),
   onPlayCustom: () => playCustom(),
+  onDesignCar: () => carMaker.open(),
+});
+
+// The "Design Your Car" pop-up. When you save, we rebuild your car, refresh its
+// garage card, and hop straight into driving it.
+const carMaker = createCarMaker({
+  onSave: (spec) => {
+    CARS.myCar = spec;
+    const entry = carList.find((c) => c.id === 'myCar');
+    if (entry) {
+      entry.name = spec.name;
+      entry.color = spec.body.color;
+      entry.stats = spec.stats;
+    }
+    hud.updateCar('myCar');
+    spawnCar('myCar');
+  },
 });
 
 // The track builder. It uses the same camera and gets its own click handling.
@@ -224,8 +247,11 @@ function frame() {
     return;
   }
 
-  // Drive.
-  const input = controls.getInput();
+  // Drive. While the "Design Car" pop-up is open, ignore the keys (so typing a
+  // car name doesn't also steer) - the car just coasts to a stop.
+  const input = carMaker.isOpen()
+    ? { throttle: 0, steer: 0, handbrake: false, brake: true }
+    : controls.getInput();
   car.controls(input);
   world.step(PHYSICS_STEP, delta, 10);
   car.update();

@@ -189,6 +189,44 @@ export const CARS = {
     backZ: 1.6,
     wheelY: -0.24,
   },
+
+  // YOUR car. This is the starting design; the "Design Car" button rebuilds it
+  // from your choices (colour, speed, grip, size) and saves it. Always unlocked.
+  myCar: {
+    name: 'My Car',
+    unlockedByDefault: true,
+    custom: true,
+    stats: { speed: 3, grip: 3, tough: 3 },
+    blurb: 'Design your own! Tap Design Car.',
+
+    mass: 480,
+    engineForce: 900,
+    maxSteer: 0.5,
+    brakeForce: 20,
+    handbrakeForce: 95,
+    suspension: {
+      stiffness: 55,
+      restLength: 0.5,
+      travel: 0.4,
+      compression: 4.4,
+      relaxation: 2.3,
+      maxForce: 150000,
+    },
+    frictionSlip: 4.1,
+    rollInfluence: 0.14,
+    body: {
+      chassis: { width: 1.8, height: 0.5, length: 3.0 },
+      cabin: { width: 1.4, height: 0.45, length: 1.6, offsetZ: -0.2 },
+      collision: { width: 1.6, height: 0.4, length: 2.0, offsetY: 0.12 },
+      color: 0xa970ff, // purple, until you pick your own
+      cabinColor: 0x222233,
+    },
+    wheel: { radius: 0.45, width: 0.3, color: 0x111111 },
+    axleWidth: 0.95,
+    frontZ: -1.6,
+    backZ: 1.6,
+    wheelY: -0.25,
+  },
 };
 
 // A tiny helper so other files can grab a car by its id without repeating the

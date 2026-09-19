@@ -27,6 +27,7 @@ export function createHud(opts) {
     onReplayLevel,
     onBuild,
     onPlayCustom,
+    onDesignCar,
   } = opts;
 
   let activeCar = currentCar;
@@ -106,8 +107,18 @@ export function createHud(opts) {
     onPlayCustom();
     myTrackBtn.blur();
   });
+  const designBtn = document.createElement('button');
+  designBtn.innerHTML = '&#127912; Design Car';
+  designBtn.style.cssText = `
+    pointer-events:auto; cursor:pointer; padding:6px 12px; border:none; border-radius:8px;
+    background:#a970ff; color:white; font-family:inherit; font-weight:700; font-size:13px;`;
+  designBtn.addEventListener('click', () => {
+    onDesignCar();
+    designBtn.blur();
+  });
   builderRow.appendChild(buildBtn);
   builderRow.appendChild(myTrackBtn);
+  builderRow.appendChild(designBtn);
   levelBar.appendChild(builderRow);
 
   // ---- top-right: Reset ----
@@ -130,14 +141,9 @@ export function createHud(opts) {
     display: flex; gap: 10px; font-family: system-ui, sans-serif; user-select: none;`;
   document.body.appendChild(garage);
 
-  const cardsById = {};
-  cars.forEach((carInfo, i) => {
-    const card = document.createElement('button');
-    card.style.cssText = `
-      position: relative; pointer-events: auto; cursor: pointer; width: 120px; padding: 8px;
-      border: 2px solid transparent; border-radius: 12px; color: #eaf2ff;
-      background: rgba(10, 20, 35, 0.6); text-align: left; font-family: inherit;`;
-
+  // Build the inside of one car card (name, colour, stat bars, padlock). Kept as
+  // a function so we can redraw the "My Car" card after you redesign it.
+  function renderCardInner(carInfo, i) {
     const stats = carInfo.stats || { speed: 3, grip: 3, tough: 3 };
     const bar = (label, value) => `
       <div style="display:flex;align-items:center;gap:4px;font-size:11px;margin-top:2px">
@@ -153,8 +159,7 @@ export function createHud(opts) {
             .join('')}
         </span>
       </div>`;
-
-    card.innerHTML =
+    return (
       `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
         <span style="width:16px;height:16px;border-radius:4px;background:${cssColor(carInfo.color)}"></span>
         <b style="font-size:14px">${carInfo.name}</b>
@@ -163,19 +168,36 @@ export function createHud(opts) {
       bar('SPD', stats.speed) +
       bar('GRP', stats.grip) +
       bar('TUF', stats.tough) +
-      // The padlock overlay, shown only while the car is locked.
       `<div class="lock" style="position:absolute;inset:0;border-radius:12px;
         background:rgba(6,10,18,0.72);display:none;align-items:center;justify-content:center;
-        font-size:26px">&#128274;</div>`;
+        font-size:26px">&#128274;</div>`
+    );
+  }
 
+  const cardsById = {};
+  cars.forEach((carInfo, i) => {
+    const card = document.createElement('button');
+    card.style.cssText = `
+      position: relative; pointer-events: auto; cursor: pointer; width: 120px; padding: 8px;
+      border: 2px solid transparent; border-radius: 12px; color: #eaf2ff;
+      background: rgba(10, 20, 35, 0.6); text-align: left; font-family: inherit;`;
+    card.innerHTML = renderCardInner(carInfo, i);
     card.addEventListener('click', () => {
       onSelectCar(carInfo.id); // main.js ignores it if the car is locked
       card.blur();
     });
-
     garage.appendChild(card);
     cardsById[carInfo.id] = card;
   });
+
+  // Redraw a car's card (used after you redesign your own car). Reads the latest
+  // info from the cars list, which main.js updates in place.
+  function updateCar(id) {
+    const i = cars.findIndex((c) => c.id === id);
+    if (i < 0) return;
+    cardsById[id].innerHTML = renderCardInner(cars[i], i);
+    refresh();
+  }
 
   // ---- middle: the "Level Complete!" banner (hidden until you win) ----
   const banner = document.createElement('div');
@@ -294,5 +316,6 @@ export function createHud(opts) {
     showWin,
     hideWin,
     setHudVisible,
+    updateCar,
   };
 }
