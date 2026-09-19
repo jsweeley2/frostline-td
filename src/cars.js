@@ -15,6 +15,7 @@ export const CARS = {
   // Fast and a little slippery. The all-rounder that likes big jumps.
   raceCar: {
     name: 'Race Car',
+    unlockedByDefault: true, // the car you start with; the rest are earned by beating levels
     // Little 1-5 bars shown on the "pick your car" screen. Just for looks.
     stats: { speed: 5, grip: 3, tough: 2 },
     blurb: 'Fast and zippy, slides in corners.',
@@ -151,6 +152,42 @@ export const CARS = {
     frontZ: -1.75,
     backZ: 1.75,
     wheelY: -0.4,
+  },
+
+  // The secret reward car. Ridiculously fast and slippery - a handful to drive,
+  // but a blast. You only get it by beating the last level.
+  rocketCar: {
+    name: 'Rocket Car',
+    stats: { speed: 5, grip: 2, tough: 2 },
+    blurb: 'Super fast and super slidey. For experts!',
+
+    mass: 350,
+    engineForce: 1250, // rockets off the line
+    maxSteer: 0.5,
+    brakeForce: 18,
+    handbrakeForce: 80,
+    suspension: {
+      stiffness: 60,
+      restLength: 0.45,
+      travel: 0.4,
+      compression: 4.6,
+      relaxation: 2.4,
+      maxForce: 100000,
+    },
+    frictionSlip: 2.8, // low grip = big slides
+    rollInfluence: 0.16,
+    body: {
+      chassis: { width: 1.7, height: 0.45, length: 3.0 },
+      cabin: { width: 1.3, height: 0.4, length: 1.4, offsetZ: -0.3 },
+      collision: { width: 1.5, height: 0.38, length: 2.0, offsetY: 0.12 },
+      color: 0x22e0e0, // electric cyan
+      cabinColor: 0x101820,
+    },
+    wheel: { radius: 0.44, width: 0.3, color: 0x111111 },
+    axleWidth: 0.95,
+    frontZ: -1.6,
+    backZ: 1.6,
+    wheelY: -0.24,
   },
 };
 

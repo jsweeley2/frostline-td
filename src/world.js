@@ -103,37 +103,89 @@ function makeGridTexture() {
 }
 
 // ---------------------------------------------------------------------------
-// RAMPS
-// A ramp is built from the PIECES.ramp entry. We build it as a tilted slab:
-// a box turned at an angle so its top face is a slope. Building the picture and
-// the physics from the SAME numbers means they always match perfectly.
+// LEVELS
+// buildLevel() builds everything for one level - its ramps and its stars - and
+// hands back:
+//   - stars   : the list of collectible stars (main.js checks if you touch them)
+//   - dispose(): removes this whole level so we can build the next one
 //
-// The clever bit: we place the slab so its top-front edge sits exactly on the
-// ground (y = 0). That means the car rolls straight from the grass onto the
-// slope with no bump or wall to catch on.
+// A ramp is built from the PIECES.ramp entry as a tilted, curved slab (see the
+// note further down). We keep a list of every mesh and body we make so dispose()
+// can clean them all up when you switch levels.
 // ---------------------------------------------------------------------------
 
-// Scatter a few ramps around so you can test jumps right away.
-// Each placement is a spot on the ground and a direction to face.
-const RAMP_PLACEMENTS = [
-  { x: 0, z: -30, yaw: 0 },
-  { x: 30, z: -60, yaw: Math.PI / 2 },
-  { x: -35, z: -20, yaw: -Math.PI / 4 },
-  { x: 15, z: -95, yaw: 0 },
-];
+export function buildLevel(scene, world, level) {
+  const meshes = []; // every picture we add, so we can remove it later
+  const bodies = []; // every physics block we add, so we can remove it later
 
-export function buildRamps(scene, world) {
+  // Build the ramps.
   const shape = PIECES.ramp.shape;
-
-  for (const spot of RAMP_PLACEMENTS) {
-    buildOneRamp(scene, world, shape, spot);
+  for (const spot of level.ramps) {
+    buildOneRamp(scene, world, shape, spot, meshes, bodies);
   }
+
+  // Build the stars you collect.
+  const stars = level.stars.map((pos) => buildStar(scene, pos, meshes));
+
+  // Take the whole level back out of both worlds.
+  function dispose() {
+    for (const m of meshes) scene.remove(m);
+    for (const b of bodies) world.removeBody(b);
+  }
+
+  return { stars, dispose };
+}
+
+// One shared star shape (a fat 5-pointed star), reused for every star.
+const STAR_GEOMETRY = makeStarGeometry();
+const STAR_MATERIAL = new THREE.MeshStandardMaterial({
+  color: 0xffd23f,
+  emissive: 0xffb300, // makes it glow a little so it pops
+  emissiveIntensity: 0.5,
+  metalness: 0.3,
+  roughness: 0.4,
+});
+
+// Build one collectible star at [x, y, z]. Returns a little record main.js uses
+// to spin it, bob it, and check if you've touched it.
+function buildStar(scene, pos, meshes) {
+  const mesh = new THREE.Mesh(STAR_GEOMETRY, STAR_MATERIAL);
+  mesh.position.set(pos[0], pos[1], pos[2]);
+  mesh.castShadow = true;
+  scene.add(mesh);
+  meshes.push(mesh);
+  return {
+    mesh,
+    position: new THREE.Vector3(pos[0], pos[1], pos[2]),
+    baseY: pos[1], // remembered so it can bob up and down around this height
+    collected: false,
+  };
+}
+
+// Draw a 5-pointed star outline and puff it out into a 3D shape.
+function makeStarGeometry() {
+  const shape = new THREE.Shape();
+  const points = 5;
+  const outer = 0.65;
+  const inner = 0.28;
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 === 0 ? outer : inner;
+    const a = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r;
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.18, bevelEnabled: false });
+  geo.center(); // so it spins around its middle
+  return geo;
 }
 
 // How many little slabs we chain together to make the smooth curve. More = smoother.
 const RAMP_SEGMENTS = 8;
 
-function buildOneRamp(scene, world, shape, spot) {
+function buildOneRamp(scene, world, shape, spot, meshes, bodies) {
   const R = shape.runLength; // how far along the ground the slope runs
   const H = shape.height; // how tall the lip is
   const w = shape.width; // how wide
@@ -159,12 +211,12 @@ function buildOneRamp(scene, world, shape, spot) {
   for (let i = 0; i < RAMP_SEGMENTS; i++) {
     const p0 = surfacePoint(i / RAMP_SEGMENTS);
     const p1 = surfacePoint((i + 1) / RAMP_SEGMENTS);
-    buildSlab(scene, world, p0, p1, w, material, yawQuat, place);
+    buildSlab(scene, world, p0, p1, w, material, yawQuat, place, meshes, bodies);
   }
 }
 
 // Build ONE straight slab whose top face is the line from p0 to p1.
-function buildSlab(scene, world, p0, p1, w, material, yawQuat, place) {
+function buildSlab(scene, world, p0, p1, w, material, yawQuat, place, meshes, bodies) {
   const t = 0.5; // how thick the slab is
   const length = p0.distanceTo(p1);
 
@@ -196,6 +248,7 @@ function buildSlab(scene, world, p0, p1, w, material, yawQuat, place) {
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   scene.add(mesh);
+  meshes.push(mesh); // remember it so the level can be torn down later
 
   // --- The physics: same box, same place. ---
   const body = new CANNON.Body({
@@ -210,4 +263,5 @@ function buildSlab(scene, world, p0, p1, w, material, yawQuat, place) {
   // car drives straight through it. (This one line cost us a LOT of debugging.)
   body.aabbNeedsUpdate = true;
   world.addBody(body);
+  bodies.push(body); // remember it so the level can be torn down later
 }
