@@ -236,6 +236,12 @@ export function createCar(scene, world, carId) {
     chassisBody.angularVelocity.set(0, 0, 0);
   }
 
+  // Show or hide the whole car (used by the track builder, which hides the car
+  // while you're placing pieces).
+  function setVisible(v) {
+    carGroup.visible = v;
+  }
+
   // Take this car out of both worlds, so we can swap in a different one.
   // Used when you pick a new car in the garage.
   function destroy() {
@@ -252,6 +258,7 @@ export function createCar(scene, world, carId) {
     update,
     respawn,
     destroy,
+    setVisible,
     getSpeedKmh,
     isGrounded,
     get steer() {

@@ -25,6 +25,8 @@ export function createHud(opts) {
     isLevelUnlocked,
     onNextLevel,
     onReplayLevel,
+    onBuild,
+    onPlayCustom,
   } = opts;
 
   let activeCar = currentCar;
@@ -82,6 +84,31 @@ export function createHud(opts) {
     levelBtnRow.appendChild(b);
     return b;
   });
+
+  // A row for the track builder: build your own track, or play the one you saved.
+  const builderRow = document.createElement('div');
+  builderRow.style.cssText = 'display:flex; gap:6px;';
+  const buildBtn = document.createElement('button');
+  buildBtn.innerHTML = '&#128296; Build';
+  buildBtn.style.cssText = `
+    pointer-events:auto; cursor:pointer; padding:6px 12px; border:none; border-radius:8px;
+    background:#3d7dff; color:white; font-family:inherit; font-weight:700; font-size:13px;`;
+  buildBtn.addEventListener('click', () => {
+    onBuild();
+    buildBtn.blur();
+  });
+  const myTrackBtn = document.createElement('button');
+  myTrackBtn.innerHTML = '&#9654; My Track';
+  myTrackBtn.style.cssText = `
+    pointer-events:auto; cursor:pointer; padding:6px 12px; border:none; border-radius:8px;
+    background:rgba(255,255,255,0.15); color:#eaf2ff; font-family:inherit; font-weight:700; font-size:13px;`;
+  myTrackBtn.addEventListener('click', () => {
+    onPlayCustom();
+    myTrackBtn.blur();
+  });
+  builderRow.appendChild(buildBtn);
+  builderRow.appendChild(myTrackBtn);
+  levelBar.appendChild(builderRow);
 
   // ---- top-right: Reset ----
   const button = document.createElement('button');
@@ -202,11 +229,22 @@ export function createHud(opts) {
   }
 
   function setLevel(index, name, total) {
-    activeLevel = index;
-    levelNumEl.textContent = index + 1;
+    activeLevel = index; // index < 0 means a custom track (no numbered level highlighted)
+    levelNumEl.textContent = index < 0 ? '★' : index + 1; // a star for custom tracks
     levelNameEl.textContent = name;
     setStars(0, total);
     refresh();
+  }
+
+  // Hide or show the whole normal HUD (the track builder hides it while you build).
+  const hudEls = [
+    [panel, 'block'],
+    [levelBar, 'flex'],
+    [button, 'block'],
+    [garage, 'flex'],
+  ];
+  function setHudVisible(on) {
+    for (const [el, disp] of hudEls) el.style.display = on ? disp : 'none';
   }
 
   // Re-check every lock and highlight, e.g. after you unlock something.
@@ -255,5 +293,6 @@ export function createHud(opts) {
     refresh,
     showWin,
     hideWin,
+    setHudVisible,
   };
 }

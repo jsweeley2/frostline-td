@@ -24,6 +24,7 @@ import { createDashboard } from './dashboard.js';
 import { createCameras } from './cameras.js';
 import { createControls } from './controls.js';
 import { createHud } from './hud.js';
+import { createBuilder, loadCustomTrack } from './builder.js';
 
 // How close the car has to get to a star to collect it.
 const COLLECT_RADIUS = 3;
@@ -56,9 +57,12 @@ const cameras = createCameras(camera, car, dashboard);
 // The current level: which one, its built pieces+stars, and how many stars left.
 let currentLevelIndex = 0;
 let level = null; // the handle from buildLevel (has .stars and .dispose)
+let levelName = '';
+let isCustomLevel = false; // true when playing a track you built yourself
 let starsTotal = 0;
 let starsCollected = 0;
 let levelWon = false;
+let buildMode = false; // true while you're in the track builder
 
 // Little helpers the HUD asks so it knows what to lock.
 const carUnlocked = (id) => isCarUnlocked(id, CARS, LEVELS, progress);
@@ -79,29 +83,45 @@ function spawnCar(id) {
   hud.setActiveCar(id);
 }
 
-// Load a level: throw away the old one, build the new one, reset the stars.
-function loadLevel(index) {
+// Load ANY level from its data (a real level or a custom track).
+function loadLevelData(data, name, { index = null, custom = false } = {}) {
   if (level) level.dispose();
-  currentLevelIndex = index;
-  const data = LEVELS[index];
+  if (index != null) currentLevelIndex = index;
+  isCustomLevel = custom;
+  levelName = name;
   level = buildLevel(scene, world, data);
   starsTotal = level.stars.length;
   starsCollected = 0;
   levelWon = false;
   car.respawn();
-  hud.setLevel(index, data.name, starsTotal);
+  hud.setLevel(custom ? -1 : currentLevelIndex, name, starsTotal);
   hud.hideWin();
   hud.refresh();
 }
 
-// Try to switch to a level (only if it's unlocked).
-function selectLevel(index) {
-  if (levelUnlocked(index)) loadLevel(index);
+// Load one of the built-in levels.
+function loadLevel(index) {
+  loadLevelData(LEVELS[index], LEVELS[index].name, { index });
 }
 
-// You collected the last star! Mark the level beaten, unlock its car, save.
+// Try to switch to a built-in level (only if it's unlocked).
+function selectLevel(index) {
+  if (index >= 0 && index < LEVELS.length && levelUnlocked(index)) loadLevel(index);
+}
+
+// Play the track you built in the builder.
+function playCustom() {
+  loadLevelData(loadCustomTrack(), 'My Track', { custom: true });
+}
+
+// You collected the last star! Show the banner. For real levels, also unlock the
+// car and save your progress. Custom tracks just say "nice one" (no unlocks).
 function winLevel() {
   levelWon = true;
+  if (isCustomLevel) {
+    hud.showWin({ levelName, unlockedCarName: null, hasNext: false });
+    return;
+  }
   const data = LEVELS[currentLevelIndex];
   const firstTime = !progress.beaten.has(currentLevelIndex);
   progress.beaten.add(currentLevelIndex);
@@ -117,6 +137,38 @@ function winLevel() {
   });
 }
 
+// ---- BUILD MODE (the track builder) ----
+
+// Enter the builder: hide the car and the normal HUD, clear the level.
+function enterBuild() {
+  buildMode = true;
+  if (level) {
+    level.dispose();
+    level = null;
+  }
+  car.setVisible(false);
+  hud.setHudVisible(false);
+  builder.enter();
+}
+
+// Leave the builder and go back to normal play.
+function exitBuild() {
+  buildMode = false;
+  builder.exit();
+  car.setVisible(true);
+  hud.setHudVisible(true);
+  loadLevel(currentLevelIndex);
+}
+
+// Pressed "Play" in the builder: drive the track you just made.
+function playBuiltTrack(data) {
+  buildMode = false;
+  builder.exit();
+  car.setVisible(true);
+  hud.setHudVisible(true);
+  loadLevelData(data, 'My Track', { custom: true });
+}
+
 // The HUD (speed, cameras, garage, level picker, win banner) and the keyboard.
 const hud = createHud({
   onReset: () => car.respawn(),
@@ -128,8 +180,21 @@ const hud = createHud({
   isCarUnlocked: carUnlocked,
   isLevelUnlocked: levelUnlocked,
   onNextLevel: () => selectLevel(currentLevelIndex + 1),
-  onReplayLevel: () => loadLevel(currentLevelIndex),
+  onReplayLevel: () => (isCustomLevel ? playCustom() : loadLevel(currentLevelIndex)),
+  onBuild: () => enterBuild(),
+  onPlayCustom: () => playCustom(),
 });
+
+// The track builder. It uses the same camera and gets its own click handling.
+const builder = createBuilder({
+  scene,
+  world,
+  camera,
+  canvas,
+  onPlay: (data) => playBuiltTrack(data),
+  onExit: () => exitBuild(),
+});
+
 const controls = createControls({
   onCamera: () => cameras.next(),
   onRespawn: () => car.respawn(),
@@ -152,6 +217,13 @@ function frame() {
   const delta = Math.min(clock.getDelta(), 0.05);
   const time = clock.elapsedTime;
 
+  // In build mode we don't drive - just look down at the track you're making.
+  if (buildMode) {
+    builder.update(delta);
+    renderer.render(scene, camera);
+    return;
+  }
+
   // Drive.
   const input = controls.getInput();
   car.controls(input);
@@ -171,7 +243,7 @@ function frame() {
       star.mesh.visible = false;
       starsCollected++;
       hud.setStars(starsCollected, starsTotal);
-      if (starsCollected === starsTotal && !levelWon) winLevel();
+      if (starsTotal > 0 && starsCollected === starsTotal && !levelWon) winLevel();
     }
   }
 
